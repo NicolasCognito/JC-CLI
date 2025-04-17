@@ -1,0 +1,169 @@
+{
+    "game": {
+      "turn": 1,
+      "registers": {
+        "meta": {
+          "max_indices": {
+            "resource": 4,
+            "slot": 10,
+            "card": 2
+          }
+        },
+        "templates": {
+          "resources": {
+            "wood": {
+              "name": "Wood"
+            },
+            "stone": {
+              "name": "Stone"
+            },
+            "iron": {
+              "name": "Iron",
+              "default_properties": {
+                "cost": 1
+              }
+            }
+          },
+          "cards": {
+            "forge": {
+              "name": "Forge",
+              "slot_count": 3,
+              "recipes": [
+                "iron_processing",
+                "smithing"
+              ]
+            },
+            "trading_post": {
+              "name": "Trading Post",
+              "slot_count": 2,
+              "recipes": [
+                "trading"
+              ]
+            }
+          },
+          "recipes": {
+            "iron_processing": {
+              "script_path": "scripts/iron_processing_recipe.lua"
+            },
+            "smithing": {
+              "script_path": "scripts/iron_processing_recipe.lua"
+            },
+            "trading": {
+              "script_path": "scripts/trading_recipe.lua"
+            }
+          }
+        },
+        "instances": {
+          "resources": {
+            "1": {
+              "template": "wood",
+              "properties": {}
+            },
+            "2": {
+              "template": "wood",
+              "properties": {}
+            },
+            "3": {
+              "template": "stone",
+              "properties": {}
+            },
+            "4": {
+              "template": "iron",
+              "properties": {
+                "cost": 2
+              }
+            }
+          },
+          "cards": {
+            "card_1": {
+              "template": "forge",
+              "slots": [
+                "slot_3",
+                "slot_4",
+                "slot_5"
+              ]
+            },
+            "card_2": {
+              "template": "trading_post",
+              "slots": [
+                "slot_6",
+                "slot_7"
+              ]
+            }
+          },
+          "slots": {
+            "slot_1": {
+              "resource": "1"
+            },
+            "slot_2": {
+              "resource": "2"
+            },
+            "slot_3": {
+              "resource": "4"
+            },
+            "slot_4": {
+              "resource": null
+            },
+            "slot_5": {
+              "resource": "3"
+            },
+            "slot_6": {
+              "resource": null
+            },
+            "slot_7": {
+              "resource": null
+            },
+            "slot_8": {
+              "resource": null
+            },
+            "slot_9": {
+              "resource": null
+            },
+            "slot_10": {
+              "resource": null
+            }
+          }
+        }
+      },
+      "state": {
+        "world": {
+          "deck": [
+            "card_2",
+            "card_3",
+            "card_4"
+          ],
+          "kingdom_stability": 100
+        },
+        "players": {
+          "player1": {
+            "inventory": {
+              "slots": [
+                "slot_1",
+                "slot_2"
+              ],
+              "max_slots": 10
+            },
+            "hand": {
+              "cards": [
+                "card_1"
+              ]
+            },
+            "points": 0
+          },
+          "player2": {
+            "inventory": {
+              "slots": [
+                "slot_10",
+                "slot_11"
+              ],
+              "max_slots": 10
+            },
+            "hand": {
+              "cards": []
+            },
+            "points": 0
+          }
+        }
+      }
+    }
+  }
