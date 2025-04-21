@@ -1,0 +1,23 @@
+# engine/core/config.py
+"""Configuration constants for the JC engine/CLI"""
+
+# Directory constants
+SESSIONS_DIR = "sessions"
+TEMPLATES_DIR = "templates"
+CLIENT_DIR = "clients" # Subdirectory within a session
+
+# Template constants
+DEFAULT_TEMPLATE = "default"
+
+# File constants within session/client dirs
+HISTORY_FILE = "history.json"       # In session dir
+WORLD_FILE = "world.json"           # In client data dir / template dir
+INITIAL_WORLD_FILE = "initial_world.json" # In session dir / template dir
+COMMANDS_FILE = "commands.json"     # In client data dir
+
+# Script names assumed to exist
+ORCHESTRATOR_SCRIPT = "orchestrator.py"
+RULE_LOOP_SCRIPT = "rule_loop.py"
+SERVER_SCRIPT = "thin_server.py"
+CLIENT_SCRIPT = "thin_client.py"
+SCRIPTS_DIR = "scripts" # Directory containing game logic scripts
