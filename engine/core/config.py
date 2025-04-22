@@ -5,6 +5,12 @@
 SESSIONS_DIR = "sessions"
 TEMPLATES_DIR = "templates"
 CLIENT_DIR = "clients" # Subdirectory within a session
+DATA_DIR = "data" # Data directory within client or session dirs
+
+# Network configuration
+SERVER_HOST = '127.0.0.1'
+SERVER_PORT = 9000
+BUFFER_SIZE = 4096
 
 # Template constants
 DEFAULT_TEMPLATE = "default"
@@ -20,4 +26,5 @@ ORCHESTRATOR_SCRIPT = "orchestrator.py"
 RULE_LOOP_SCRIPT = "rule_loop.py"
 SERVER_SCRIPT = "thin_server.py"
 CLIENT_SCRIPT = "thin_client.py"
+SEQUENCER_SCRIPT = "sequencer.py"
 SCRIPTS_DIR = "scripts" # Directory containing game logic scripts

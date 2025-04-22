@@ -15,11 +15,14 @@ def start_sequencer(client):
         bool: True if started, False otherwise
     """
     try:
-        # Prepare sequencer command with client directory
-        sequencer_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "sequencer.py"
-        )
+        # Use the correct sequencer path from project root
+        # Instead of looking in engine directory, use the path from config
+        sequencer_path = config.SEQUENCER_SCRIPT
+        
+        # Make sure the path exists before trying to run it
+        if not os.path.exists(sequencer_path):
+            print(f"Error: Sequencer script not found at '{sequencer_path}'")
+            return False
         
         sequencer_cmd = [
             sys.executable, 
