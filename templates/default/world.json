@@ -1,7 +1,7 @@
 {
-  "counter": 5,
+  "counter": 0,
   "rule_map": {
     "trim_counter": "counter_threshold.py"
   },
-  "applied_rules": ["trim_counter"]
+  "rules_in_power":["trim_counter"]
 }

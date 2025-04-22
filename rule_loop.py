@@ -49,14 +49,9 @@ def execute_rule(rule_id, script_name, world):
         # Parse the updated world from stdout
         updated_world = json.loads(result.stdout.decode())
         
-        # Add this rule to the applied rules list
-        if "applied_rules" not in updated_world:
-            updated_world["applied_rules"] = []
-        
         # Check exit code to determine what happened
         if result.returncode == 0:
             # Rule applied changes
-            updated_world["applied_rules"].append(rule_id)
             print(f"Rule {rule_id} applied changes")
             return updated_world, True
         elif result.returncode == 9:
@@ -84,22 +79,25 @@ def main():
     # Load the current world state
     world = load_world()
     
-    # Reset applied rules list at the start of each rule loop cycle
-    world["applied_rules"] = []
-    
     # Get rule map from world
     rule_map = world.get("rule_map", {})
     
-    # Execute all rules in the rule map
+    # Get rules in power from world (with fallback to all rules if not specified)
+    rules_in_power = world.get("rules_in_power", list(rule_map.keys()))
+    
+    # Execute only rules that are in power
     for rule_id, script_name in rule_map.items():
-        updated_world, rule_changed = execute_rule(rule_id, script_name, world)
-        
-        # Update our world state with the rule's changes
-        world = updated_world
-        
-        # Track if any rule made changes
-        if rule_changed:
-            changes_made = True
+        if rule_id in rules_in_power:
+            updated_world, rule_changed = execute_rule(rule_id, script_name, world)
+            
+            # Update our world state with the rule's changes
+            world = updated_world
+            
+            # Track if any rule made changes
+            if rule_changed:
+                changes_made = True
+        else:
+            print(f"Rule {rule_id} is not in power, skipping")
     
     # Save the final world state back to disk
     save_world(world)

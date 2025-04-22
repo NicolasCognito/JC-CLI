@@ -2,7 +2,7 @@
 """
 JC-CLI Orchestrator - Improved Version
 Executes a specific command and runs the rule loop.
-Now with clearer logging.
+Now with clearer logging and rule activation/exclusion.
 """
 import subprocess
 import sys
@@ -24,6 +24,9 @@ if not os.path.exists(WORLD_FILE):
 # Simple command-to-script mapping
 COMMANDS = {
     "raise": "scripts/commands/raise_value.py",
+    "exclude": "scripts/commands/exclude_rule.py",
+    "activate": "scripts/commands/activate_rule.py",
+    "rules": "scripts/commands/list_rules.py",
     "exit": None
 }
 
