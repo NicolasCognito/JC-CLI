@@ -45,14 +45,24 @@ def send_history(server, client_socket):
             with open(server['history_path'], 'r') as f:
                 history = json.load(f)
             
+            if not history:
+                print("No history to send to new client")
+                return
+                
             print(f"Sending {len(history)} historical commands to new client")
             
-            # Send each command in order
-            for cmd in history:
-                # Convert to bytes and send
-                cmd_bytes = json.dumps(cmd).encode('utf-8')
-                client_socket.sendall(cmd_bytes)
-                time.sleep(0.05)  # Small delay to prevent flooding
+            # Send history as a batch with a special wrapper to distinguish it from regular commands
+            history_package = {
+                "type": "history_batch",
+                "commands": history
+            }
+            
+            # Convert to bytes and send as a single message
+            history_bytes = json.dumps(history_package).encode('utf-8')
+            client_socket.sendall(history_bytes)
+            
+            print(f"History batch sent successfully")
+            
     except Exception as e:
         print(f"Error sending history: {e}")
 

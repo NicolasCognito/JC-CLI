@@ -70,6 +70,30 @@ def send_command(client, command_text):
         print(f"Error sending command: {e}")
         return False
 
+def process_command(client, ordered_command):
+    """Process a single command
+    
+    Args:
+        client (dict): Client state
+        ordered_command (dict): Command with sequence number
+    """
+    try:
+        # Append to commands file
+        append_command(client, ordered_command)
+        
+        # Display for user
+        seq = ordered_command["seq"]
+        username = ordered_command["command"]["username"]
+        cmd_text = ordered_command["command"]["text"]
+        
+        # Highlight own messages
+        if username == client['username']:
+            print(f"[{seq}] You: {cmd_text}")
+        else:
+            print(f"[{seq}] {username}: {cmd_text}")
+    except Exception as e:
+        print(f"Error processing command: {e}")
+
 def listen_for_broadcasts(client):
     """Listen for broadcasts from the server
     
@@ -77,6 +101,9 @@ def listen_for_broadcasts(client):
         client (dict): Client state
     """
     try:
+        # Buffer for incomplete messages
+        buffer = b""
+        
         while True:
             try:
                 data = client['socket'].recv(config.BUFFER_SIZE)
@@ -84,25 +111,31 @@ def listen_for_broadcasts(client):
                     print("\nDisconnected from server")
                     break
                 
-                # Parse the ordered command
-                ordered_command = json.loads(data.decode('utf-8'))
+                # Add to buffer
+                buffer += data
                 
-                # Append to commands file
-                append_command(client, ordered_command)
-                
-                # Display for user
-                seq = ordered_command["seq"]
-                username = ordered_command["command"]["username"]
-                cmd_text = ordered_command["command"]["text"]
-                
-                # Highlight own messages
-                if username == client['username']:
-                    print(f"[{seq}] You: {cmd_text}")
-                else:
-                    print(f"[{seq}] {username}: {cmd_text}")
+                try:
+                    # Try to parse the buffer as JSON
+                    message = json.loads(buffer.decode('utf-8'))
+                    buffer = b""  # Clear buffer after successful parse
+                    
+                    # Check if it's a history batch
+                    if isinstance(message, dict) and message.get("type") == "history_batch":
+                        print(f"Received history batch with {len(message.get('commands', []))} commands")
+                        # Process all commands in the batch
+                        for cmd in message.get("commands", []):
+                            process_command(client, cmd)
+                    else:
+                        # It's a regular command
+                        process_command(client, message)
+                    
+                except json.JSONDecodeError:
+                    # Incomplete message, wait for more data
+                    continue
                 
             except json.JSONDecodeError as e:
                 print(f"Error decoding message: {e}")
+                buffer = b""  # Reset buffer on error
             except socket.error as e:
                 print(f"\nNetwork error: {e}")
                 print("Disconnected from server.")
