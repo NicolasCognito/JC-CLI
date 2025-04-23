@@ -1,32 +1,38 @@
 # engine/server/client_handling.py
-"""Per-client receive loop with framed decoding"""
+"""Per‑client loop that now also replies to history page requests."""
 
-import socket
+import socket, json
 from engine.core import config, netcodec
 from engine.server import command_processing
 
-# ---------------------------------------------------------------------------#
 
-
-def handle_client(server: dict, client_socket: socket.socket, addr) -> None:
-    """Receive player commands from one client and pass them to the processor."""
+def handle_client(server, sock: socket.socket, addr):
     decoder = netcodec.NetDecoder()
+
+    # push snapshot & meta immediately
+    command_processing.send_snapshot(server, sock)
+    command_processing.send_history_meta(server, sock)
 
     try:
         while True:
-            chunk = client_socket.recv(config.BUFFER_SIZE)
+            chunk = sock.recv(config.BUFFER_SIZE)
             if not chunk:
                 break
-
-            for message in decoder.feed(chunk):
+            for msg in decoder.feed(chunk):
+                # history page request from client
+                if isinstance(msg, dict) and msg.get("type") == "history_request":
+                    frm = int(msg.get("from", 1))
+                    command_processing.send_history_page(server, sock, frm)
+                    continue
+                # otherwise treat as player command
                 try:
-                    command_processing.process_command(server, message)
+                    command_processing.process_command(server, msg)
                 except Exception as exc:
-                    print(f"Error processing command from {addr}: {exc}")
-    except (socket.error, OSError) as exc:
+                    print(f"Error processing from {addr}: {exc}")
+    except Exception as exc:
         print(f"Socket error with {addr}: {exc}")
     finally:
-        if client_socket in server["clients"]:
-            server["clients"].remove(client_socket)
-        client_socket.close()
-        print(f"Connection closed: {addr}")
+        if sock in server["clients"]:
+            server["clients"].remove(sock)
+        sock.close()
+        print("Connection closed:", addr)

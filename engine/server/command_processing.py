@@ -1,18 +1,16 @@
 # engine/server/command_processing.py
-"""Coordinator-side sequence stamping and broadcast (framed)"""
+"""Coordinator‑side sequence stamping and history paging."""
 
-import json
-import time
-import os
+import json, os, time, base64
 from typing import Dict, Any
+from engine.core import config, netcodec
 
-from engine.core import netcodec
+# -------------------------------------------------------------------- #
+# Command flow
 
-# ---------------------------------------------------------------------------#
 
-
-def process_command(server: Dict, command: Dict) -> None:
-    """Assign a global sequence number and distribute."""
+def process_command(server: Dict, command: Dict):
+    """Assign global order and broadcast."""
     with server["lock"]:
         server["sequence_number"] += 1
         seq = server["sequence_number"]
@@ -26,90 +24,76 @@ def process_command(server: Dict, command: Dict) -> None:
         _broadcast(server, ordered)
         _append_to_history(server, ordered)
 
-        username = command.get("username", "unknown")
-        text = command.get("text", "")
-        print(f"[{seq}] {username}: {text}")
+        print(f"[{seq}] {command.get('username','?')}: {command.get('text','')}")
+
+# -------------------------------------------------------------------- #
+# Snapshot & history helpers
 
 
-def send_history(server: Dict, client_socket) -> None:
-    """Push the full backlog to a newly connected client (single framed msg)."""
-    try:
-        if not os.path.exists(server["history_path"]):
-            return
-
-        with open(server["history_path"], "r") as fh:
-            history = json.load(fh)
-
-        if not history:
-            print("No history to send.")
-            return
-
-        print(f"Sending {len(history)} commands of history to new client.")
-        packet = {
-            "type": "history_batch",
-            "commands": history,
-        }
-        client_socket.sendall(netcodec.encode(packet))
-    except Exception as exc:
-        print(f"History send failed: {exc}")
-
-import base64, zipfile, io
-from engine.core import config
-
-def send_snapshot(server: dict, client_socket):
-    """Push client_snapshot.zip to a freshly connected client."""
-    zip_path = os.path.join(
-        server["session_dir"],
-        config.SNAPSHOT_DIR,
-        config.CLIENT_ZIP_NAME,
-    )
+def send_snapshot(server: Dict, sock):
+    """Unchanged from previous patch (streams client zip)."""
+    import base64
+    zip_path = os.path.join(server["session_dir"], config.SNAPSHOT_DIR, config.CLIENT_ZIP_NAME)
     try:
         with open(zip_path, "rb") as fh:
             blob = base64.b64encode(fh.read()).decode("ascii")
         packet = {"type": "snapshot_zip", "name": config.CLIENT_ZIP_NAME, "b64": blob}
-        client_socket.sendall(netcodec.encode(packet))
-        print("Sent client snapshot zip.")
+        sock.sendall(netcodec.encode(packet))
     except Exception as exc:
-        print(f"Snapshot send failed: {exc}")
+        print("Snapshot send failed:", exc)
+
+# -------------------------------------------------------------------- #
+# NEW: paged history
 
 
-# ---------------------------------------------------------------------------#
-# Internal helpers                                                           #
-# ---------------------------------------------------------------------------#
+def send_history_meta(server: Dict, sock):
+    """Send highest sequence number so client knows how many pages to pull."""
+    meta = {"type": "history_meta", "highest_seq": server["sequence_number"], "page_size": config.HISTORY_PAGE_SIZE}
+    sock.sendall(netcodec.encode(meta))
 
 
-def _broadcast(server: Dict, ordered_command: Dict) -> None:
-    """Frame + send the message to every connected client."""
-    blob = netcodec.encode(ordered_command)
+def send_history_page(server: Dict, sock, from_seq: int):
+    """Send a page beginning at *from_seq* inclusive."""
+    page_size = config.HISTORY_PAGE_SIZE
+    try:
+        with open(server["history_path"], "r") as fh:
+            history = json.load(fh)
+    except Exception:
+        history = []
+
+    page = [cmd for cmd in history if cmd.get("seq", 0) >= from_seq][:page_size]
+    packet = {"type": "history_page", "commands": page}
+    sock.sendall(netcodec.encode(packet))
+
+# -------------------------------------------------------------------- #
+# Internal helpers
+
+
+def _broadcast(server: Dict, ordered: Dict):
+    blob = netcodec.encode(ordered)
     dead = []
-
-    for sock in server["clients"]:
+    for c in server["clients"]:
         try:
-            sock.sendall(blob)
+            c.sendall(blob)
         except Exception:
-            dead.append(sock)
-
-    for sock in dead:
-        if sock in server["clients"]:
-            server["clients"].remove(sock)
+            dead.append(c)
+    for c in dead:
+        server["clients"].remove(c)
         try:
-            sock.close()
+            c.close()
         except Exception:
             pass
 
 
-def _append_to_history(server: Dict, ordered_command: Dict) -> None:
+def _append_to_history(server: Dict, ordered: Dict):
     try:
         if os.path.exists(server["history_path"]):
             with open(server["history_path"], "r") as fh:
-                history = json.load(fh)
+                hist = json.load(fh)
         else:
-            history = []
-
-        history.append(ordered_command)
+            hist = []
+        hist.append(ordered)
         with open(server["history_path"], "w") as fh:
-            json.dump(history, fh, indent=2)
+            json.dump(hist, fh, indent=2)
     except Exception as exc:
-        print(f"Failed to write history: {exc}")
-
-
+        print("History write failed:", exc)

@@ -65,38 +65,46 @@ def process_command(client: dict, ordered_command: dict) -> None:
 
 # ---------------------------------------------------------------------------#
 
-def listen_for_broadcasts(client: dict) -> None:
-    """Background thread – decodes frames and routes by packet *type*."""
-    sock     = client["socket"]
-    decoder  = netcodec.NetDecoder()
+HISTORY_PAGE_SIZE = config.HISTORY_PAGE_SIZE
+
+# store these in client dict
+def listen_for_broadcasts(client: dict):
+    sock, dec = client["socket"], netcodec.NetDecoder()
+    client["_history_high"] = None
+    client["_next_seq_pull"] = 1
 
     try:
         while True:
             chunk = sock.recv(config.BUFFER_SIZE)
             if not chunk:
-                print("\nDisconnected from server.")
+                print("\nDisconnected.")
                 break
-
-            for msg in decoder.feed(chunk):
-                # --- packet routing ------------------------------------
+            for msg in dec.feed(chunk):
                 if isinstance(msg, dict):
-                    ptype = msg.get("type")
-                    if ptype == "snapshot_zip":
+                    typ = msg.get("type")
+                    if typ == "snapshot_zip":
                         _handle_snapshot_zip(client, msg)
-                    elif ptype == "history_batch":
+                    elif typ == "history_meta":
+                        client["_history_high"] = msg["highest_seq"]
+                        _request_history(client)
+                    elif typ == "history_page":
                         for cmd in msg.get("commands", []):
                             process_command(client, cmd)
-                    # ignore any other control packet types for now
-                    elif "seq" in msg:        # genuine ordered command
+                            client["_next_seq_pull"] = cmd["seq"] + 1
+                        _request_history(client)
+                    elif "seq" in msg:
                         process_command(client, msg)
-                    else:
-                        # Unknown packet; keep decoder alive, just log once
-                        print("Received non-command packet, ignored:", msg.keys())
-                # If somehow a non-dict arrives we drop it silently
-    except (socket.error, OSError) as exc:
-        print(f"\nNetwork error: {exc}")
     except Exception as exc:
-        print(f"Listener failure: {exc}")
+        print("Listener error:", exc)
+
+
+def _request_history(client):
+    high = client.get("_history_high")
+    nextseq = client.get("_next_seq_pull", 1)
+    if high is None or nextseq > high:
+        return  # done
+    packet = {"type": "history_request", "from": nextseq}
+    client["socket"].sendall(netcodec.encode(packet))
 
 
 def _handle_snapshot_zip(client: dict, msg: dict):
