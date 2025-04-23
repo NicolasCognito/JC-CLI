@@ -4,31 +4,30 @@
 # Directory constants
 SESSIONS_DIR = "sessions"
 TEMPLATES_DIR = "templates"
-CLIENT_DIR = "clients"        # Subdirectory within a session
-DATA_DIR = "data"             # Data directory within client or session dirs
+CLIENT_DIR   = "clients"
+DATA_DIR     = "data"
 
-# Network configuration
-SERVER_HOST = "0.0.0.0"       # Listen on all interfaces by default
+# Network
+SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 9000
 BUFFER_SIZE = 4096
+FRAME_HEADER_BYTES = 4          # used by netcodec
 
-# --- NEW ---
-FRAME_HEADER_BYTES = 4        # Length-prefix size used by netcodec
-# -----------
-
-# Template constants
+# Template
 DEFAULT_TEMPLATE = "default"
 
-# File constants within session/client dirs
-HISTORY_FILE = "history.json"         # In session dir
-WORLD_FILE = "world.json"             # In client data dir / template dir
-INITIAL_WORLD_FILE = "initial_world.json"  # In session dir / template dir
-COMMANDS_FILE = "commands.json"       # In client data dir
+# File names
+HISTORY_FILE       = "history.json"
+WORLD_FILE         = "world.json"
+INITIAL_WORLD_FILE = "initial_world.json"
 
-# Script names assumed to exist
+COMMANDS_LOG_FILE  = "commands.log"   # ← append-only, JSON-lines
+CURSOR_FILE        = "cursor.seq"     # ← sequencer progress marker
+
+# Script names
 ORCHESTRATOR_SCRIPT = "orchestrator.py"
 RULE_LOOP_SCRIPT     = "rule_loop.py"
 SERVER_SCRIPT        = "thin_server.py"
 CLIENT_SCRIPT        = "thin_client.py"
 SEQUENCER_SCRIPT     = "sequencer.py"
-SCRIPTS_DIR          = "scripts"      # Directory containing game-logic scripts
+SCRIPTS_DIR          = "scripts"

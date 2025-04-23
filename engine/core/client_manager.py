@@ -46,13 +46,8 @@ def join_session(session_name, client_name, server_ip=None):
         return False
 
     # Initialize empty commands file
-    client_commands_file = os.path.join(client_data_dir, config.COMMANDS_FILE)
-    try:
-        with open(client_commands_file, 'w') as f:
-            json.dump([], f)
-    except IOError as e:
-        print(f"Error creating empty commands file '{client_commands_file}': {e}")
-        return False
+    client_commands_log = os.path.join(client_data_dir, config.COMMANDS_LOG_FILE)
+    open(client_commands_log, "w").close()
 
     # Copy required scripts to client directory
     scripts_to_copy_to_root = [config.ORCHESTRATOR_SCRIPT, config.RULE_LOOP_SCRIPT]

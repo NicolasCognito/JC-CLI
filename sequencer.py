@@ -1,138 +1,137 @@
 #!/usr/bin/env python3
 """
-JC-CLI Sequencer - Event-Based Version
-Watches commands.json file using a file system watcher and executes
-unprocessed commands in sequence order without continuous polling.
+Event-based Sequencer – append-only log + cursor
+Processes commands in strict sequence, exactly once.
 """
-import json
-import os
-import subprocess
-import sys
-import argparse
-import shlex
-import time
-import threading
+
+import os, sys, json, time, argparse, shlex, subprocess, threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from engine.core import config
 
-class CommandFileHandler(FileSystemEventHandler):
-    """Handles file system events for the commands.json file"""
-    
+# ---------------------------------------------------------------------------#
+# Helper: read/write cursor                                                  #
+# ---------------------------------------------------------------------------#
+
+def _read_cursor(path: str) -> int:
+    try:
+        with open(path, "r") as fh:
+            return int(fh.read().strip() or 0)
+    except FileNotFoundError:
+        return 0
+    except ValueError:
+        return 0
+
+def _write_cursor(path: str, seq: int) -> None:
+    with open(path, "w") as fh:
+        fh.write(str(seq))
+
+# ---------------------------------------------------------------------------#
+# Watchdog handler                                                           #
+# ---------------------------------------------------------------------------#
+
+class _LogEventHandler(FileSystemEventHandler):
     def __init__(self, sequencer):
         self.sequencer = sequencer
-        self.last_processed_time = time.time()
-        # Debounce window to avoid multiple events for a single file write
-        self.debounce_window = 0.1  
-
     def on_modified(self, event):
-        """Called when commands.json is modified"""
-        if not event.is_directory and os.path.basename(event.src_path) == "commands.json":
-            # Debounce to avoid processing the same change multiple times
-            current_time = time.time()
-            if current_time - self.last_processed_time > self.debounce_window:
-                self.last_processed_time = current_time
-                # Process next command in a separate thread to keep watcher responsive
-                threading.Thread(target=self.sequencer.process_next_command).start()
+        if not event.is_directory and event.src_path == self.sequencer.log_file:
+            threading.Thread(target=self.sequencer.process_new).start()
 
-class EventBasedSequencer:
-    """Event-based implementation of the JC-CLI sequencer"""
-    
-    def __init__(self, client_dir=None):
-        """Initialize the sequencer
-        
-        Args:
-            client_dir (str, optional): Directory for client data
-        """
-        # Set up paths
+# ---------------------------------------------------------------------------#
+# Sequencer                                                                  #
+# ---------------------------------------------------------------------------#
+
+class Sequencer:
+    def __init__(self, client_dir: str | None = None):
         self.client_dir = client_dir or os.getcwd()
-        self.data_dir = os.path.join(self.client_dir, "data")
-        self.commands_file = os.path.join(self.data_dir, "commands.json")
-        
-        # Ensure data directory exists
-        os.makedirs(self.data_dir, exist_ok=True)
-        
-        # Initialize commands file if it doesn't exist
-        if not os.path.exists(self.commands_file):
-            with open(self.commands_file, 'w') as f:
-                json.dump([], f)
-        
-        # Orchestrator path (same directory as this script)
-        self.orchestrator_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), 
-            "orchestrator.py"
-        )
-        
-        # Processing lock to avoid race conditions
-        self.processing_lock = threading.Lock()
-        
-        # Observer for file system events
+        self.data_dir   = os.path.join(self.client_dir, "data")
+        self.log_file   = os.path.join(self.data_dir, config.COMMANDS_LOG_FILE)
+        self.cursor_file= os.path.join(self.data_dir, config.CURSOR_FILE)
+        self.orchestrator = os.path.join(os.path.dirname(__file__), "orchestrator.py")
+
+        for p in (self.data_dir,):
+            os.makedirs(p, exist_ok=True)
+        open(self.log_file, "a").close()   # ensure exists
+
+        self.cursor = _read_cursor(self.cursor_file)
+        self.lock   = threading.Lock()
+
         self.observer = Observer()
-        self.event_handler = CommandFileHandler(self)
-        
-        print(f"Event-based sequencer initialized. Client dir: {self.client_dir}")
-        
+        self.observer.schedule(_LogEventHandler(self), self.data_dir, recursive=False)
+
+        print(f"Sequencer ready – watching {self.log_file}")
+
+    # ------------------------------------------------------------------ #
+
     def start(self):
-        """Start the file system observer"""
-        self.observer.schedule(self.event_handler, self.data_dir, recursive=False)
+        self.process_new()   # catch up first
         self.observer.start()
-        print(f"Watching for changes in {self.commands_file}")
-        
-        # Process any commands that might already be in the file
-        self.process_next_command()
-        
         try:
-            # Keep the main thread alive
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
             self.stop()
-            
+
     def stop(self):
-        """Stop the file system observer"""
-        print("Stopping sequencer...")
+        print("Stopping sequencer.")
         self.observer.stop()
         self.observer.join()
-        print("Sequencer stopped.")
-            
-    def process_next_command(self):
-        if not self.processing_lock.acquire(blocking=False):
+
+    # ------------------------------------------------------------------ #
+
+    def process_new(self):
+        if not self.lock.acquire(blocking=False):
             return
         try:
-            while True:
-                with open(self.commands_file, 'r') as f:
-                    commands = json.load(f)
+            next_seq = self.cursor + 1
+            with open(self.log_file, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    try:
+                        cmd = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    # skip already-handled
+                    if cmd.get("seq") != next_seq:
+                        continue
 
-                last_seq = max((c.get("seq", 0) for c in commands if c.get("processed")), default=0)
-                target_seq = last_seq + 1
-
-                # locate the next unprocessed command
-                for idx, c in enumerate(commands):
-                    if c.get("seq") == target_seq and not c.get("processed", False):
-                        break
-                else:
-                    return   # nothing left to do
-
-                commands[idx]["processed"] = True
-                with open(self.commands_file, 'w') as f:
-                    json.dump(commands, f, indent=2)
-
-                cmd_text = c["command"]["text"]
-                user = c["command"]["username"]
-                subprocess.run([sys.executable, self.orchestrator_path, cmd_text, user],
-                            cwd=self.client_dir)
+                    self._execute(cmd)
+                    self.cursor = next_seq
+                    _write_cursor(self.cursor_file, self.cursor)
+                    next_seq += 1
         finally:
-            self.processing_lock.release()
+            self.lock.release()
+
+    # ------------------------------------------------------------------ #
+
+    def _execute(self, cmd):
+        seq = cmd["seq"]
+        text = cmd["command"]["text"]
+        user = cmd["command"]["username"]
+
+        parts = shlex.split(text)
+        cmd_name, cmd_args = (parts[0], parts[1:]) if parts else ("", [])
+
+        print(f"[Command:{seq}] Processing '{cmd_name}' from {user}")
+        if cmd_args:
+            print(f"[Command:{seq}] Args: {cmd_args}")
+
+        result = subprocess.run(
+            [sys.executable, self.orchestrator, text, user],
+            cwd=self.client_dir,
+        )
+        if result.returncode:
+            print(f"[Command:{seq}] '{cmd_name}' failed with code {result.returncode}")
+
+# ---------------------------------------------------------------------------#
 
 def main():
-    """Main entry point"""
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="JC-CLI Event-Based Sequencer")
+    parser = argparse.ArgumentParser(description="JC-CLI Sequencer (append-only)")
     parser.add_argument("--dir", help="Client directory to use", default=None)
     args = parser.parse_args()
-    
-    # Create and start sequencer
-    sequencer = EventBasedSequencer(client_dir=args.dir)
-    sequencer.start()
+
+    Sequencer(client_dir=args.dir).start()
 
 if __name__ == "__main__":
     main()
