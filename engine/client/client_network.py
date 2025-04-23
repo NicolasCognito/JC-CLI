@@ -50,20 +50,25 @@ def _append_command(client: dict, ordered: Any) -> None:
         print(f"Error storing command locally: {exc}")
 
 
-def process_command(client: dict, ordered: Any) -> None:
-    _append_command(client, ordered)
+def process_command(client: dict, ordered_command: dict) -> None:
+    """Append the command and show it."""
+    try:
+        _append_command(client, ordered_command)
 
-    seq   = ordered["seq"]
-    user  = ordered["command"]["username"]
-    text  = ordered["command"]["text"]
-    label = "You" if user == client["username"] else user
-    print(f"[{seq}] {label}: {text}")
+        seq   = ordered_command["seq"]
+        user  = ordered_command["command"]["username"]
+        text  = ordered_command["command"]["text"]
+        who   = "You" if user == client["username"] else user
+        print(f"[{seq}] {who}: {text}")
+    except Exception as exc:
+        print(f"Command processing error: {exc}")
 
+# ---------------------------------------------------------------------------#
 
 def listen_for_broadcasts(client: dict) -> None:
-    sock, dec = client["socket"], client["_decoder"]
-
-    
+    """Background thread – decodes frames and routes by packet *type*."""
+    sock     = client["socket"]
+    decoder  = netcodec.NetDecoder()
 
     try:
         while True:
@@ -71,17 +76,28 @@ def listen_for_broadcasts(client: dict) -> None:
             if not chunk:
                 print("\nDisconnected from server.")
                 break
-            for msg in dec.feed(chunk):
-                if isinstance(msg, dict) and msg.get("type") == "history_batch":
-                    for cmd in msg.get("commands", []):
-                        process_command(client, cmd)
-                if isinstance(msg, dict) and msg.get("type") == "snapshot_zip":
-                    _handle_snapshot_zip(client, msg)
-                    continue
-                else:
-                    process_command(client, msg)
+
+            for msg in decoder.feed(chunk):
+                # --- packet routing ------------------------------------
+                if isinstance(msg, dict):
+                    ptype = msg.get("type")
+                    if ptype == "snapshot_zip":
+                        _handle_snapshot_zip(client, msg)
+                    elif ptype == "history_batch":
+                        for cmd in msg.get("commands", []):
+                            process_command(client, cmd)
+                    # ignore any other control packet types for now
+                    elif "seq" in msg:        # genuine ordered command
+                        process_command(client, msg)
+                    else:
+                        # Unknown packet; keep decoder alive, just log once
+                        print("Received non-command packet, ignored:", msg.keys())
+                # If somehow a non-dict arrives we drop it silently
     except (socket.error, OSError) as exc:
         print(f"\nNetwork error: {exc}")
+    except Exception as exc:
+        print(f"Listener failure: {exc}")
+
 
 def _handle_snapshot_zip(client: dict, msg: dict):
     import base64, zipfile, io, os, shutil, sys
