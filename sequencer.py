@@ -95,69 +95,31 @@ class EventBasedSequencer:
         print("Sequencer stopped.")
             
     def process_next_command(self):
-        """Process the next unprocessed command in sequence"""
-        # Use a lock to prevent concurrent processing
         if not self.processing_lock.acquire(blocking=False):
             return
-            
         try:
-            # Read commands
-            with open(self.commands_file, 'r') as f:
-                commands = json.load(f)
-            
-            # Find next unprocessed command in sequence
-            next_cmd = None
-            next_index = None
-            
-            # Find the last processed command sequence number
-            last_seq = 0
-            for cmd in commands:
-                if cmd.get("processed", False):
-                    last_seq = max(last_seq, cmd.get("seq", 0))
-            
-            # Look for the next command in sequence
-            next_seq = last_seq + 1
-            for i, cmd in enumerate(commands):
-                if cmd.get("seq") == next_seq and not cmd.get("processed", False):
-                    next_cmd = cmd
-                    next_index = i
-                    break
-            
-            # Process command if found
-            if next_cmd:
-                # Mark as processed immediately
-                commands[next_index]["processed"] = True
+            while True:
+                with open(self.commands_file, 'r') as f:
+                    commands = json.load(f)
+
+                last_seq = max((c.get("seq", 0) for c in commands if c.get("processed")), default=0)
+                target_seq = last_seq + 1
+
+                # locate the next unprocessed command
+                for idx, c in enumerate(commands):
+                    if c.get("seq") == target_seq and not c.get("processed", False):
+                        break
+                else:
+                    return   # nothing left to do
+
+                commands[idx]["processed"] = True
                 with open(self.commands_file, 'w') as f:
                     json.dump(commands, f, indent=2)
-                
-                # Get command text and username
-                cmd_text = next_cmd['command']['text']
-                username = next_cmd['command']['username']
-                
-                # Parse command to get the actual command and args
-                cmd_parts = shlex.split(cmd_text)
-                cmd_name = cmd_parts[0] if cmd_parts else ""
-                cmd_args = cmd_parts[1:] if len(cmd_parts) > 1 else []
-                
-                # Log command execution BEFORE running it
-                print(f"[Command:{next_seq}] Processing '{cmd_name}' from {username}")
-                if cmd_args:
-                    print(f"[Command:{next_seq}] Args: {cmd_args}")
-                
-                # Execute the command
-                result = subprocess.run(
-                    [sys.executable, self.orchestrator_path, cmd_text, username],
-                    cwd=self.client_dir
-                )
-                
-                if result.returncode != 0:
-                    print(f"[Command:{next_seq}] '{cmd_name}' failed with code {result.returncode}")
-                
-                # Process next command if available (recursive chain, but each in its own thread)
-                # This ensures commands are processed in sequence without waiting for polling
-                self.process_next_command()
-        except Exception as e:
-            print(f"Error processing command: {e}")
+
+                cmd_text = c["command"]["text"]
+                user = c["command"]["username"]
+                subprocess.run([sys.executable, self.orchestrator_path, cmd_text, user],
+                            cwd=self.client_dir)
         finally:
             self.processing_lock.release()
 
