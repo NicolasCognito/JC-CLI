@@ -71,6 +71,7 @@ def listen_for_connections(server):
             server['clients'].append(client_socket)
             
             # Send history to new client
+            command_processing.send_snapshot(server, client_socket)
             command_processing.send_history(server, client_socket)
             
     except KeyboardInterrupt:

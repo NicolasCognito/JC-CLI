@@ -1,33 +1,37 @@
 # engine/core/config.py
-"""Configuration constants for the JC engine/CLI"""
+"""Configuration constants for the JC-CLI prototype."""
 
-# Directory constants
-SESSIONS_DIR = "sessions"
-TEMPLATES_DIR = "templates"
-CLIENT_DIR   = "clients"
-DATA_DIR     = "data"
+# ------------- folders & files -----------------
+SESSIONS_DIR        = "sessions"
+TEMPLATES_DIR       = "templates"
+DEFAULT_TEMPLATE     = "default"
+CLIENT_DIR          = "clients"
+DATA_DIR            = "data"
+SNAPSHOT_DIR        = "engine_snapshot"      # inside session
 
-# Network
-SERVER_HOST = "0.0.0.0"
-SERVER_PORT = 9000
-BUFFER_SIZE = 4096
-FRAME_HEADER_BYTES = 4          # used by netcodec
+ENGINE_MANIFEST     = "engine_snapshot.json"
+CLIENT_MANIFEST     = "client_snapshot.json"
 
-# Template
-DEFAULT_TEMPLATE = "default"
+ENGINE_ZIP_NAME     = "engine_snapshot.zip"
+CLIENT_ZIP_NAME     = "client_snapshot.zip"
 
-# File names
-HISTORY_FILE       = "history.json"
-WORLD_FILE         = "world.json"
-INITIAL_WORLD_FILE = "initial_world.json"
+HISTORY_FILE        = "history.json"
+WORLD_FILE          = "world.json"
+INITIAL_WORLD_FILE  = "initial_world.json"
 
-COMMANDS_LOG_FILE  = "commands.log"   # ← append-only, JSON-lines
-CURSOR_FILE        = "cursor.seq"     # ← sequencer progress marker
+COMMANDS_LOG_FILE   = "commands.log"
+CURSOR_FILE         = "cursor.seq"
 
-# Script names
+# ------------- network -------------------------
+SERVER_HOST         = "0.0.0.0"
+SERVER_PORT         = 9000
+BUFFER_SIZE         = 4096
+FRAME_HEADER_BYTES  = 4
+
+# ------------- entry scripts -------------------
 ORCHESTRATOR_SCRIPT = "orchestrator.py"
-RULE_LOOP_SCRIPT     = "rule_loop.py"
-SERVER_SCRIPT        = "thin_server.py"
-CLIENT_SCRIPT        = "thin_client.py"
-SEQUENCER_SCRIPT     = "sequencer.py"
-SCRIPTS_DIR          = "scripts"
+RULE_LOOP_SCRIPT    = "rule_loop.py"
+SERVER_SCRIPT       = "thin_server.py"
+CLIENT_SCRIPT       = "thin_client.py"
+SEQUENCER_SCRIPT    = "sequencer.py"
+SCRIPTS_DIR         = "scripts"

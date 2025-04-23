@@ -63,6 +63,8 @@ def process_command(client: dict, ordered: Any) -> None:
 def listen_for_broadcasts(client: dict) -> None:
     sock, dec = client["socket"], client["_decoder"]
 
+    
+
     try:
         while True:
             chunk = sock.recv(config.BUFFER_SIZE)
@@ -73,7 +75,21 @@ def listen_for_broadcasts(client: dict) -> None:
                 if isinstance(msg, dict) and msg.get("type") == "history_batch":
                     for cmd in msg.get("commands", []):
                         process_command(client, cmd)
+                if isinstance(msg, dict) and msg.get("type") == "snapshot_zip":
+                    _handle_snapshot_zip(client, msg)
+                    continue
                 else:
                     process_command(client, msg)
     except (socket.error, OSError) as exc:
         print(f"\nNetwork error: {exc}")
+
+def _handle_snapshot_zip(client: dict, msg: dict):
+    import base64, zipfile, io, os, shutil, sys
+    try:
+        data   = base64.b64decode(msg["b64"])
+        buffer = io.BytesIO(data)
+        with zipfile.ZipFile(buffer, "r") as zf:
+            zf.extractall(client["client_dir"])
+        print("Snapshot received & unpacked.")
+    except Exception as exc:
+        print(f"Snapshot unpack error: {exc}")

@@ -53,6 +53,25 @@ def send_history(server: Dict, client_socket) -> None:
     except Exception as exc:
         print(f"History send failed: {exc}")
 
+import base64, zipfile, io
+from engine.core import config
+
+def send_snapshot(server: dict, client_socket):
+    """Push client_snapshot.zip to a freshly connected client."""
+    zip_path = os.path.join(
+        server["session_dir"],
+        config.SNAPSHOT_DIR,
+        config.CLIENT_ZIP_NAME,
+    )
+    try:
+        with open(zip_path, "rb") as fh:
+            blob = base64.b64encode(fh.read()).decode("ascii")
+        packet = {"type": "snapshot_zip", "name": config.CLIENT_ZIP_NAME, "b64": blob}
+        client_socket.sendall(netcodec.encode(packet))
+        print("Sent client snapshot zip.")
+    except Exception as exc:
+        print(f"Snapshot send failed: {exc}")
+
 
 # ---------------------------------------------------------------------------#
 # Internal helpers                                                           #
@@ -92,3 +111,5 @@ def _append_to_history(server: Dict, ordered_command: Dict) -> None:
             json.dump(history, fh, indent=2)
     except Exception as exc:
         print(f"Failed to write history: {exc}")
+
+
