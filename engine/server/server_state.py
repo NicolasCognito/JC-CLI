@@ -6,6 +6,42 @@ import socket
 import threading
 from engine.core import config
 
+def get_local_ip_addresses():
+    """Get all local IP addresses of this machine
+    
+    Returns:
+        list: List of IP addresses
+    """
+    local_ips = []
+    try:
+        # Try connecting to an external server to determine route
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # This doesn't actually create a connection
+            s.connect(('8.8.8.8', 1))
+            local_ip = s.getsockname()[0]
+            local_ips.append(local_ip)
+        except Exception:
+            pass
+        finally:
+            s.close()
+            
+        # If that didn't work, try hostname resolution
+        if not local_ips:
+            hostname = socket.gethostname()
+            ip_list = socket.getaddrinfo(hostname, None)
+            
+            for ip_info in ip_list:
+                ip = ip_info[4][0]
+                # Only include IPv4 addresses that aren't localhost
+                if not ip.startswith('127.') and ':' not in ip:
+                    local_ips.append(ip)
+                
+    except Exception as e:
+        print(f"Warning: Could not determine local IP addresses: {e}")
+    
+    return local_ips
+
 def initialize(session_dir=None):
     """Initialize server state
     
@@ -33,6 +69,9 @@ def initialize(session_dir=None):
         # Get initial sequence number
         sequence_number = get_highest_sequence(history_path)
         
+        # Get local IP addresses for display
+        local_ips = get_local_ip_addresses()
+        
         # Return server state
         return {
             'socket': server_socket,
@@ -40,7 +79,8 @@ def initialize(session_dir=None):
             'lock': threading.Lock(),
             'session_dir': session_dir,
             'history_path': history_path,
-            'sequence_number': sequence_number
+            'sequence_number': sequence_number,
+            'local_ips': local_ips
         }
     except Exception as e:
         print(f"Error initializing server: {e}")
@@ -69,8 +109,3 @@ def get_highest_sequence(history_path):
     except Exception as e:
         print(f"Error reading history file: {e}")
         return 0
-
-
-
-
-

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-JC-CLI Thin Client - Refactored Version
+JC-CLI Thin Client - Network-Enabled Version
 A minimal client that sends commands to the server, appends received ordered
 commands to a log file, and launches a local sequencer for command processing.
 """
@@ -26,20 +26,23 @@ def main():
     parser = argparse.ArgumentParser(description="JC-CLI Thin Client")
     parser.add_argument("--dir", help="Client directory to use", default=None)
     parser.add_argument("--username", help="Username to use", default=None)
+    parser.add_argument("--server-ip", help="Server IP address", default=None)
+    parser.add_argument("--server-port", help=f"Server port (default: {config.SERVER_PORT})", 
+                       type=int, default=config.SERVER_PORT)
     args = parser.parse_args()
     
     # Set up client state
-    client = client_state.initialize(args.dir, args.username)
+    client = client_state.initialize(args.dir, args.username, args.server_ip, args.server_port)
     if not client:
         return
     
     # Connect to server
     if not client_network.connect(client):
-        print(f"Could not connect to server at {config.SERVER_HOST}:{config.SERVER_PORT}")
-        print("Make sure the server is running.")
+        print(f"Could not connect to server at {client['server_host']}:{client['server_port']}")
+        print("Make sure the server is running and network connection is available.")
         return
     
-    print(f"Connected to server at {config.SERVER_HOST}:{config.SERVER_PORT}")
+    print(f"Connected to server at {client['server_host']}:{client['server_port']}")
     
     # Start the sequencer
     if not sequencer_control.start_sequencer(client):
@@ -65,7 +68,7 @@ def main():
 
 def command_loop(client):
     """Read commands from user input and send to server"""
-    print("Enter commands (Ctrl+C to exit):")
+    print(f"Enter commands (Ctrl+C to exit):")
     try:
         while True:
             command_text = input("> ")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # cli.py (Located in project root, outside 'engine' folder)
 """
-JC-CLI - Interactive Session Manager (Modular Version)
+JC-CLI - Interactive Session Manager (Network-Enabled Version)
 Provides an interactive shell for managing game sessions and clients.
 
 Run from the project root directory:
@@ -9,11 +9,12 @@ Run from the project root directory:
 
 Available commands:
   start-session <session-name> [template]  - Start a new game session
-  continue-session <session-name>           - Continue an existing session
-  join-session <session-name> <client-name> - Join a session as a client
-  list-sessions                             - List available sessions
-  help                                      - Show available commands
-  exit                                      - Exit the shell
+  continue-session <session-name>          - Continue an existing session
+  join-session <session-name> <client-name> [server-ip]
+                                          - Join a session as a client
+  list-sessions                            - List available sessions
+  help                                     - Show available commands
+  exit                                     - Exit the shell
 """
 
 import sys
@@ -30,15 +31,15 @@ def show_help():
     print("Available commands:")
     # Use config.DEFAULT_TEMPLATE for dynamic help text
     print(f"  start-session <session-name> [template={config.DEFAULT_TEMPLATE}] - Start a new game session")
-    print("  continue-session <session-name>          - Continue an existing session")
-    print("  join-session <session-name> <client-name> - Join a session as a client")
-    print("  list-sessions                            - List available sessions")
-    print("  help                                     - Show this help message")
-    print("  exit                                     - Exit the shell")
+    print("  continue-session <session-name>                                    - Continue an existing session")
+    print("  join-session <session-name> <client-name> [server-ip]              - Join a session as a client")
+    print("  list-sessions                                                      - List available sessions")
+    print("  help                                                               - Show this help message")
+    print("  exit                                                               - Exit the shell")
 
 def interactive_shell():
     """Run the interactive shell"""
-    print("JC-CLI Interactive Shell (Modular Version)")
+    print("JC-CLI Interactive Shell (Network-Enabled Version)")
     print("Enter 'help' for available commands, 'exit' to quit")
 
     while True:
@@ -81,11 +82,12 @@ def interactive_shell():
         elif command == "join-session":
             if len(args) < 3:
                 print("Error: Missing session name or client name")
-                print("Usage: join-session <session-name> <client-name>")
+                print("Usage: join-session <session-name> <client-name> [server-ip]")
                 continue
             session_name = args[1]
             client_name = args[2]
-            client_manager.join_session(session_name, client_name) # Call function from client_manager
+            server_ip = args[3] if len(args) > 3 else None
+            client_manager.join_session(session_name, client_name, server_ip) # Call function from client_manager
         else:
             print(f"Unknown command: {command}")
             print("Enter 'help' for available commands")
@@ -114,10 +116,11 @@ def main():
             session_name = args[1]
             session_manager.continue_session(session_name)
         elif command == "join-session":
-            if len(args) < 3: print("Usage: join-session <session-name> <client-name>"); return
+            if len(args) < 3: print("Usage: join-session <session-name> <client-name> [server-ip]"); return
             session_name = args[1]
             client_name = args[2]
-            client_manager.join_session(session_name, client_name)
+            server_ip = args[3] if len(args) > 3 else None
+            client_manager.join_session(session_name, client_name, server_ip)
         elif command == "list-sessions":
             session_manager.list_sessions()
         elif command == "help":

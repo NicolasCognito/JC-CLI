@@ -8,7 +8,7 @@ CLIENT_DIR = "clients" # Subdirectory within a session
 DATA_DIR = "data" # Data directory within client or session dirs
 
 # Network configuration
-SERVER_HOST = '127.0.0.1'
+SERVER_HOST = '0.0.0.0'  # Listen on all interfaces by default
 SERVER_PORT = 9000
 BUFFER_SIZE = 4096
 

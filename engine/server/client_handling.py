@@ -24,9 +24,9 @@ def handle_client(server, client_socket, addr):
                 command_json = json.loads(data.decode('utf-8'))
                 command_processing.process_command(server, command_json)
             except json.JSONDecodeError as e:
-                print(f"Error decoding command: {e}")
+                print(f"Error decoding command from {addr}: {e}")
             except Exception as e:
-                print(f"Error processing command: {e}")
+                print(f"Error processing command from {addr}: {e}")
                 
     except Exception as e:
         print(f"Error handling client {addr}: {e}")

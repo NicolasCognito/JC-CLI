@@ -34,7 +34,7 @@ def list_sessions():
                     history = json.load(f)
                     command_count = len(history)
             except json.JSONDecodeError:
-                command_count = "ERROR reading history" # More specific error
+                command_count = "ERROR reading history"
 
         # Count clients
         client_base_dir = os.path.join(session_dir, config.CLIENT_DIR)
@@ -48,26 +48,33 @@ def list_sessions():
             print(f"    Clients: {', '.join(clients)}")
 
 def start_session(session_name, template_name=config.DEFAULT_TEMPLATE):
-    """Start a new game session"""
+    """Start a new game session
+    
+    Args:
+        session_name (str): Name of the session
+        template_name (str, optional): Template to use
+    
+    Returns:
+        bool: True if started successfully, False otherwise
+    """
     session_dir = os.path.join(config.SESSIONS_DIR, session_name)
     if os.path.exists(session_dir):
         print(f"Error: Session '{session_name}' already exists")
         print("Use 'continue-session' to continue an existing session")
         return False
 
-    # Check if template exists - original checked for WORLD_FILE, but copied INITIAL_WORLD_FILE. Let's check for INITIAL_WORLD_FILE.
+    # Check if template exists
     template_dir = os.path.join(config.TEMPLATES_DIR, template_name)
-    template_initial_world = os.path.join(template_dir, config.INITIAL_WORLD_FILE) # Based on original copy logic
+    template_initial_world = os.path.join(template_dir, config.INITIAL_WORLD_FILE)
     if not os.path.exists(template_initial_world):
         print(f"Error: Template initial world file not found at '{template_initial_world}'")
-        # Also check template dir itself for better error message?
         if not os.path.exists(template_dir):
              print(f"Error: Template directory '{template_dir}' not found.")
         return False
 
     # Create session directory structure
     os.makedirs(session_dir, exist_ok=True)
-    os.makedirs(os.path.join(session_dir, config.CLIENT_DIR), exist_ok=True) # Create base client dir
+    os.makedirs(os.path.join(session_dir, config.CLIENT_DIR), exist_ok=True)
 
     # Copy initial world from template
     session_initial_world = os.path.join(session_dir, config.INITIAL_WORLD_FILE)
@@ -75,10 +82,7 @@ def start_session(session_name, template_name=config.DEFAULT_TEMPLATE):
         shutil.copy2(template_initial_world, session_initial_world)
     except Exception as e:
         print(f"Error copying template world file: {e}")
-        # Clean up potentially partially created session?
-        # shutil.rmtree(session_dir) # Consider adding cleanup on failure
         return False
-
 
     # Create empty history file
     history_path = os.path.join(session_dir, config.HISTORY_FILE)
@@ -87,24 +91,31 @@ def start_session(session_name, template_name=config.DEFAULT_TEMPLATE):
             json.dump([], f)
     except IOError as e:
         print(f"Error creating history file '{history_path}': {e}")
-        # shutil.rmtree(session_dir) # Consider cleanup
         return False
 
     print(f"Created new session '{session_name}' using template '{template_name}' in '{session_dir}'")
 
     # Launch the server in a new terminal
-    # Pass the relative session dir path to the server script
-    server_cmd = f"{sys.executable} {config.SERVER_SCRIPT} --session-dir \"{session_dir}\"" # Ensure path is quoted
+    server_cmd = f"{sys.executable} {config.SERVER_SCRIPT} --session-dir \"{session_dir}\""
+                  
     if utils.launch_in_new_terminal(server_cmd, title=f"JC Server: {session_name}"):
         print(f"Server for session '{session_name}' launched in a new terminal.")
         return True
     else:
         print(f"Failed to launch server automatically.")
-        # Session was created, but server failed to launch. Inform user.
-        return False # Indicate launch failure, though session exists.
+        print(f"You can start it manually with:")
+        print(f"  {server_cmd}")
+        return False
 
 def continue_session(session_name):
-    """Continue an existing game session by launching its server"""
+    """Continue an existing game session by launching its server
+    
+    Args:
+        session_name (str): Name of the session
+    
+    Returns:
+        bool: True if continued successfully, False otherwise
+    """
     session_dir = os.path.join(config.SESSIONS_DIR, session_name)
     if not os.path.exists(session_dir):
         print(f"Error: Session '{session_name}' not found at '{session_dir}'")
@@ -115,14 +126,16 @@ def continue_session(session_name):
          print(f"Error: Server script '{config.SERVER_SCRIPT}' not found in current directory.")
          return False
 
-
     print(f"Attempting to continue session '{session_name}'...")
 
-    # Launch the server in a new terminal
-    server_cmd = f"{sys.executable} {config.SERVER_SCRIPT} --session-dir \"{session_dir}\"" # Quote path
+    # Launch the server in a new terminal with network parameters
+    server_cmd = f"{sys.executable} {config.SERVER_SCRIPT} --session-dir \"{session_dir}\""
+                  
     if utils.launch_in_new_terminal(server_cmd, title=f"JC Server: {session_name}"):
         print(f"Server for session '{session_name}' launched in a new terminal.")
         return True
     else:
         print(f"Failed to launch server for session '{session_name}'.")
+        print(f"You can start it manually with:")
+        print(f"  {server_cmd}")
         return False

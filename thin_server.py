@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-JC-CLI Thin Server - Refactored Version
+JC-CLI Thin Server - Network-Enabled Version
 A minimal coordinator that receives commands, assigns sequence numbers,
-and broadcasts them to all connected clients.
+and broadcasts them to all connected clients over a local network.
 """
 import socket
 import json
@@ -29,6 +29,21 @@ def main():
     if not server:
         return
     
+    # Print network information
+    print(f"\n===== JC-CLI SERVER NETWORK INFORMATION =====")
+    print(f"Server listening on port {config.SERVER_PORT}")
+    print("\nClients can connect using any of these addresses:")
+    
+    if server['local_ips']:
+        for ip in server['local_ips']:
+            print(f"* {ip}:{config.SERVER_PORT}")
+    else:
+        print(f"* localhost:{config.SERVER_PORT} (this machine only)")
+        
+    print("\nTo connect a remote client, use:")
+    print(f"python jc-cli.py join-session {os.path.basename(server['session_dir'])} <client-name> <SERVER_IP>")
+    print("===============================================\n")
+    
     # Start listening for connections
     listen_for_connections(server)
 
@@ -39,7 +54,6 @@ def listen_for_connections(server):
         server (dict): Server state
     """
     server['socket'].listen(5)
-    print(f"Server listening on {config.SERVER_HOST}:{config.SERVER_PORT}")
     
     try:
         while True:

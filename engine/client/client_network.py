@@ -2,6 +2,7 @@
 """Client network functions"""
 import json
 import socket
+import time
 from engine.core import config
 
 def connect(client):
@@ -14,9 +15,18 @@ def connect(client):
         bool: True if connected, False otherwise
     """
     try:
-        client['socket'].connect((config.SERVER_HOST, config.SERVER_PORT))
+        # Use client-specific server host and port
+        print(f"Connecting to server at {client['server_host']}:{client['server_port']}...")
+        client['socket'].connect((client['server_host'], client['server_port']))
         return True
     except ConnectionRefusedError:
+        print("Connection refused. The server might not be running.")
+        return False
+    except socket.gaierror:
+        print(f"Network error: Address '{client['server_host']}' is invalid or not reachable.")
+        return False
+    except TimeoutError:
+        print("Connection timed out. Check network connectivity and server address.")
         return False
     except Exception as e:
         print(f"Connection error: {e}")
@@ -52,6 +62,10 @@ def send_command(client, command_text):
         # Send as JSON
         client['socket'].sendall(json.dumps(command).encode('utf-8'))
         return True
+    except socket.error as e:
+        print(f"Network error while sending command: {e}")
+        print("You may have been disconnected from the server.")
+        return False
     except Exception as e:
         print(f"Error sending command: {e}")
         return False
@@ -64,12 +78,12 @@ def listen_for_broadcasts(client):
     """
     try:
         while True:
-            data = client['socket'].recv(config.BUFFER_SIZE)
-            if not data:
-                print("Disconnected from server")
-                break
-            
             try:
+                data = client['socket'].recv(config.BUFFER_SIZE)
+                if not data:
+                    print("\nDisconnected from server")
+                    break
+                
                 # Parse the ordered command
                 ordered_command = json.loads(data.decode('utf-8'))
                 
@@ -89,6 +103,11 @@ def listen_for_broadcasts(client):
                 
             except json.JSONDecodeError as e:
                 print(f"Error decoding message: {e}")
+            except socket.error as e:
+                print(f"\nNetwork error: {e}")
+                print("Disconnected from server.")
+                break
+                
     except Exception as e:
         print(f"Error while listening for broadcasts: {e}")
 
