@@ -1,3 +1,5 @@
+NAME = "list"
+
 #!/usr/bin/env python3
 """
 List Rules Command

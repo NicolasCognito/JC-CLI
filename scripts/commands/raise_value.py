@@ -1,3 +1,5 @@
+NAME = "raise"
+
 #!/usr/bin/env python3
 """
 Command: raise

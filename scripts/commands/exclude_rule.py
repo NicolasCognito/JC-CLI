@@ -1,3 +1,5 @@
+NAME = "exclude"
+
 #!/usr/bin/env python3
 """
 Exclude Rule Command

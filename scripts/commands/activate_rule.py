@@ -1,3 +1,5 @@
+name = "include"
+
 #!/usr/bin/env python3
 """
 Activate Rule Command

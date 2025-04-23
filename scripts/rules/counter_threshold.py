@@ -1,3 +1,5 @@
+NAME = "trim_counter"
+
 #!/usr/bin/env python3
 """
 Rule script: Counter Threshold

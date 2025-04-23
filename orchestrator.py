@@ -1,98 +1,89 @@
 #!/usr/bin/env python3
 """
-JC-CLI Orchestrator - Improved Version
-Executes a specific command and runs the rule loop.
-Now with clearer logging and rule activation/exclusion.
+Game-agnostic Orchestrator
+
+• Recursively scans scripts/commands/** for Python files whose first line is
+      NAME = "some_command"
+  and builds a {command_name: script_path} registry.
+
+• When the player enters a command, the orchestrator looks it up in that
+  registry, runs the script in a subprocess, and then invokes rule_loop.py.
+
+Exit codes
+----------
+0  – command + rule loop succeeded
+1+ – an error occurred (details printed to console)
 """
-import subprocess
-import sys
-import shlex
-import json
-import os
+import os, sys, shlex, subprocess, json, re, pathlib
 
-# Ensure data directory exists
-os.makedirs("data", exist_ok=True)
+CWD           = pathlib.Path.cwd()
+COMMANDS_DIR  = CWD / "scripts" / "commands"
+RULE_LOOP_PY  = CWD / "rule_loop.py"
+WORLD_FILE    = CWD / "data" / "world.json"
+NAME_PATTERN  = re.compile(r'NAME\s*=\s*["\'](.+?)["\']')
 
-# World file path
-WORLD_FILE = "data/world.json"
+def _discover_commands(folder: pathlib.Path = COMMANDS_DIR) -> dict[str, str]:
+    registry: dict[str, str] = {}
+    for path in folder.rglob("*.py"):
+        try:
+            with path.open() as fh:
+                for line in fh:
+                    s = line.strip()
+                    if not s or s.startswith("#"):
+                        continue
+                    m = NAME_PATTERN.match(s)
+                    if m:
+                        registry[m.group(1)] = str(path)
+                    break
+        except OSError:
+            pass
+    return registry
 
-# Initialize world if it doesn't exist
-if not os.path.exists(WORLD_FILE):
-    with open(WORLD_FILE, "w") as f:
-        json.dump({"counter": 0}, f)
+COMMANDS = _discover_commands()
 
-# Simple command-to-script mapping
-COMMANDS = {
-    "raise": "scripts/commands/raise_value.py",
-    "exclude": "scripts/commands/exclude_rule.py",
-    "activate": "scripts/commands/activate_rule.py",
-    "rules": "scripts/commands/list_rules.py",
-    "exit": None
-}
+def _ensure_world():
+    WORLD_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not WORLD_FILE.exists():
+        WORLD_FILE.write_text(json.dumps({"counter": 0}, indent=2))
 
-def execute_command(command, args, username):
-    """Execute a command script as a subprocess"""
-    script = COMMANDS.get(command)
-    
-    if script is None:
-        print(f"Unknown command: {command}")
+def _execute_command(cmd: str, argv: list[str]) -> bool:
+    script = COMMANDS.get(cmd)
+    if not script:
+        print(f"Unknown command: {cmd}")
         return False
-    
-    # Verify script exists
     if not os.path.exists(script):
-        print(f"Error: Command script not found at {script}")
+        print(f"Script not found: {script}")
         return False
-        
-    # Execute the command - let output flow directly to console
-    # This ensures output appears in real-time and in correct order
-    cmd_args = [sys.executable, script] + args
-    
-    print(f"Executing: {script} with args: {args}")
-    result = subprocess.run(cmd_args)
-    
-    if result.returncode != 0:
-        print(f"Command failed with exit code {result.returncode}")
+    print(f"→ {cmd} ► {script} {argv}")
+    rc = subprocess.run([sys.executable, script, *argv]).returncode
+    if rc != 0:
+        print(f"Command failed (exit {rc})")
         return False
-    
     return True
 
-def run_rule_loop():
-    """Run the rule loop to apply automatic effects"""
-    print("Running rule loop...")
-    result = subprocess.run([sys.executable, "rule_loop.py"])
-    
-    if result.returncode != 0 and result.returncode != 9:
-        print(f"Rule loop failed with exit code {result.returncode}")
-
 def main():
-    # Usage: orchestrator.py <command-text> <username>
     if len(sys.argv) < 2:
-        print("Usage: orchestrator.py <command-text> <username>")
+        print("Usage: orchestrator.py <command-text> [username]")
         sys.exit(1)
-    
-    # Get command text and username from args
-    command_text = sys.argv[1]
-    username = sys.argv[2] if len(sys.argv) >= 3 else "unknown"
-    
-    # Parse the command
-    args = shlex.split(command_text)
+
+    _ensure_world()
+    raw = sys.argv[1]
+    args = shlex.split(raw)
     if not args:
         print("Empty command")
         sys.exit(1)
-    
-    command = args[0]
-    if command == "exit":
-        print("Exit command received")
+    cmd, argv = args[0], args[1:]
+
+    if cmd == "exit":
         sys.exit(0)
-    
-    # Execute the command
-    command_args = args[1:]
-    if execute_command(command, command_args, username):
-        # If command was successful, run the rule loop
-        run_rule_loop()
+
+    if _execute_command(cmd, argv):
+        rl = subprocess.run([sys.executable, RULE_LOOP_PY]).returncode
+        if rl not in (0, 9):
+            print(f"Rule loop failed (exit {rl})")
+            sys.exit(1)
         sys.exit(0)
     else:
-        # Command failed
         sys.exit(1)
 
 if __name__ == "__main__":
