@@ -1,37 +1,32 @@
 # engine/server/client_handling.py
-"""Client handling module"""
-import json
-from engine.core import config
+"""Per-client receive loop with framed decoding"""
+
+import socket
+from engine.core import config, netcodec
 from engine.server import command_processing
 
-def handle_client(server, client_socket, addr):
-    """Handle messages from a client
-    
-    Args:
-        server (dict): Server state
-        client_socket (socket): Client socket
-        addr (tuple): Client address
-    """
+# ---------------------------------------------------------------------------#
+
+
+def handle_client(server: dict, client_socket: socket.socket, addr) -> None:
+    """Receive player commands from one client and pass them to the processor."""
+    decoder = netcodec.NetDecoder()
+
     try:
         while True:
-            data = client_socket.recv(config.BUFFER_SIZE)
-            if not data:
+            chunk = client_socket.recv(config.BUFFER_SIZE)
+            if not chunk:
                 break
-                
-            # Process command
-            try:
-                # Parse the command JSON
-                command_json = json.loads(data.decode('utf-8'))
-                command_processing.process_command(server, command_json)
-            except json.JSONDecodeError as e:
-                print(f"Error decoding command from {addr}: {e}")
-            except Exception as e:
-                print(f"Error processing command from {addr}: {e}")
-                
-    except Exception as e:
-        print(f"Error handling client {addr}: {e}")
+
+            for message in decoder.feed(chunk):
+                try:
+                    command_processing.process_command(server, message)
+                except Exception as exc:
+                    print(f"Error processing command from {addr}: {exc}")
+    except (socket.error, OSError) as exc:
+        print(f"Socket error with {addr}: {exc}")
     finally:
-        if client_socket in server['clients']:
-            server['clients'].remove(client_socket)
+        if client_socket in server["clients"]:
+            server["clients"].remove(client_socket)
         client_socket.close()
         print(f"Connection closed: {addr}")

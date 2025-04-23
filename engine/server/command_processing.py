@@ -1,116 +1,94 @@
 # engine/server/command_processing.py
-"""Command processing module"""
+"""Coordinator-side sequence stamping and broadcast (framed)"""
+
 import json
 import time
 import os
+from typing import Dict, Any
 
-def process_command(server, command):
-    """Assign sequence number and broadcast to all clients
-    
-    Args:
-        server (dict): Server state
-        command (dict): Command data
-    """
-    with server['lock']:
-        # Assign sequence number
-        server['sequence_number'] += 1
-        
-        # Create ordered command
-        ordered_command = {
-            "seq": server['sequence_number'],
+from engine.core import netcodec
+
+# ---------------------------------------------------------------------------#
+
+
+def process_command(server: Dict, command: Dict) -> None:
+    """Assign a global sequence number and distribute."""
+    with server["lock"]:
+        server["sequence_number"] += 1
+        seq = server["sequence_number"]
+
+        ordered = {
+            "seq": seq,
             "timestamp": time.time(),
-            "command": command
+            "command": command,
         }
-        
-        # Broadcast to all clients
-        broadcast(server, ordered_command)
-        
-        # Append to history file
-        append_to_history(server, ordered_command)
-        
-        # Print command info
+
+        _broadcast(server, ordered)
+        _append_to_history(server, ordered)
+
         username = command.get("username", "unknown")
-        cmd_text = command.get("text", "")
-        print(f"[{server['sequence_number']}] {username}: {cmd_text}")
+        text = command.get("text", "")
+        print(f"[{seq}] {username}: {text}")
 
-def send_history(server, client_socket):
-    """Send command history to a new client
-    
-    Args:
-        server (dict): Server state
-        client_socket (socket): Client socket
-    """
-    try:
-        if os.path.exists(server['history_path']):
-            with open(server['history_path'], 'r') as f:
-                history = json.load(f)
-            
-            if not history:
-                print("No history to send to new client")
-                return
-                
-            print(f"Sending {len(history)} historical commands to new client")
-            
-            # Send history as a batch with a special wrapper to distinguish it from regular commands
-            history_package = {
-                "type": "history_batch",
-                "commands": history
-            }
-            
-            # Convert to bytes and send as a single message
-            history_bytes = json.dumps(history_package).encode('utf-8')
-            client_socket.sendall(history_bytes)
-            
-            print(f"History batch sent successfully")
-            
-    except Exception as e:
-        print(f"Error sending history: {e}")
 
-def append_to_history(server, ordered_command):
-    """Append command to history file
-    
-    Args:
-        server (dict): Server state
-        ordered_command (dict): Command with sequence number
-    """
+def send_history(server: Dict, client_socket) -> None:
+    """Push the full backlog to a newly connected client (single framed msg)."""
     try:
-        # Read existing history
-        if os.path.exists(server['history_path']):
-            with open(server['history_path'], 'r') as f:
-                history = json.load(f)
+        if not os.path.exists(server["history_path"]):
+            return
+
+        with open(server["history_path"], "r") as fh:
+            history = json.load(fh)
+
+        if not history:
+            print("No history to send.")
+            return
+
+        print(f"Sending {len(history)} commands of history to new client.")
+        packet = {
+            "type": "history_batch",
+            "commands": history,
+        }
+        client_socket.sendall(netcodec.encode(packet))
+    except Exception as exc:
+        print(f"History send failed: {exc}")
+
+
+# ---------------------------------------------------------------------------#
+# Internal helpers                                                           #
+# ---------------------------------------------------------------------------#
+
+
+def _broadcast(server: Dict, ordered_command: Dict) -> None:
+    """Frame + send the message to every connected client."""
+    blob = netcodec.encode(ordered_command)
+    dead = []
+
+    for sock in server["clients"]:
+        try:
+            sock.sendall(blob)
+        except Exception:
+            dead.append(sock)
+
+    for sock in dead:
+        if sock in server["clients"]:
+            server["clients"].remove(sock)
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+
+def _append_to_history(server: Dict, ordered_command: Dict) -> None:
+    try:
+        if os.path.exists(server["history_path"]):
+            with open(server["history_path"], "r") as fh:
+                history = json.load(fh)
         else:
             history = []
-        
-        # Append new command
-        history.append(ordered_command)
-        
-        # Write back to file
-        with open(server['history_path'], 'w') as f:
-            json.dump(history, f, indent=2)
-            
-    except Exception as e:
-        print(f"Error appending to history file: {e}")
 
-def broadcast(server, ordered_command):
-    """Send the command to all connected clients
-    
-    Args:
-        server (dict): Server state
-        ordered_command (dict): Command with sequence number
-    """
-    message = json.dumps(ordered_command).encode('utf-8')
-    
-    # List of clients to remove (in case of errors)
-    dead_clients = []
-    
-    for client in server['clients']:
-        try:
-            client.sendall(message)
-        except Exception:
-            dead_clients.append(client)
-    
-    # Remove any clients that failed
-    for client in dead_clients:
-        if client in server['clients']:
-            server['clients'].remove(client)
-            client.close()
+        history.append(ordered_command)
+        with open(server["history_path"], "w") as fh:
+            json.dump(history, fh, indent=2)
+    except Exception as exc:
+        print(f"Failed to write history: {exc}")

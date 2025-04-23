@@ -1,167 +1,117 @@
 # engine/client/client_network.py
-"""Client network functions"""
-import json
+"""Client-side networking helpers with length-prefixed framing"""
+
 import socket
-import time
+from typing import Any
 from engine.core import config
+from engine.core import netcodec
 
-def connect(client):
-    """Connect to the server
-    
-    Args:
-        client (dict): Client state
-        
-    Returns:
-        bool: True if connected, False otherwise
-    """
+# Public API -----------------------------------------------------------------
+
+
+def connect(client: dict) -> bool:
+    """Open the TCP connection to the coordinator."""
     try:
-        # Use client-specific server host and port
-        print(f"Connecting to server at {client['server_host']}:{client['server_port']}...")
-        client['socket'].connect((client['server_host'], client['server_port']))
+        host, port = client["server_host"], client["server_port"]
+        print(f"Connecting to server at {host}:{port} …")
+        client["socket"].connect((host, port))
+        # Create a decoder for this socket
+        client["_decoder"] = netcodec.NetDecoder()
         return True
-    except ConnectionRefusedError:
-        print("Connection refused. The server might not be running.")
-        return False
-    except socket.gaierror:
-        print(f"Network error: Address '{client['server_host']}' is invalid or not reachable.")
-        return False
-    except TimeoutError:
-        print("Connection timed out. Check network connectivity and server address.")
-        return False
-    except Exception as e:
-        print(f"Connection error: {e}")
+    except (ConnectionError, OSError) as exc:
+        print(f"Connection error: {exc}")
         return False
 
-def disconnect(client):
-    """Disconnect from the server
-    
-    Args:
-        client (dict): Client state
-    """
+
+def disconnect(client: dict) -> None:
+    """Close the TCP socket."""
     try:
-        client['socket'].close()
+        client["socket"].close()
     except Exception:
         pass
 
-def send_command(client, command_text):
-    """Send command to the server
-    
-    Args:
-        client (dict): Client state
-        command_text (str): Command text to send
-        
-    Returns:
-        bool: True if sent, False otherwise
-    """
+
+def send_command(client: dict, command_text: str) -> bool:
+    """Send a *player* command to the coordinator."""
     try:
-        # Create command with username
-        command = {
-            "username": client['username'],
-            "text": command_text
+        payload = {
+            "username": client["username"],
+            "text": command_text,
         }
-        # Send as JSON
-        client['socket'].sendall(json.dumps(command).encode('utf-8'))
+        client["socket"].sendall(netcodec.encode(payload))
         return True
-    except socket.error as e:
-        print(f"Network error while sending command: {e}")
-        print("You may have been disconnected from the server.")
-        return False
-    except Exception as e:
-        print(f"Error sending command: {e}")
+    except (socket.error, OSError) as exc:
+        print(f"Network error while sending: {exc}")
         return False
 
-def process_command(client, ordered_command):
-    """Process a single command
-    
-    Args:
-        client (dict): Client state
-        ordered_command (dict): Command with sequence number
-    """
+
+# ---------------------------------------------------------------------------#
+# Receiving / processing broadcasts                                          #
+# ---------------------------------------------------------------------------#
+
+
+def process_command(client: dict, ordered_command: Any) -> None:
+    """Append the command to file and show it in the local console."""
     try:
-        # Append to commands file
-        append_command(client, ordered_command)
-        
-        # Display for user
+        _append_command_to_file(client, ordered_command)
+
         seq = ordered_command["seq"]
         username = ordered_command["command"]["username"]
         cmd_text = ordered_command["command"]["text"]
-        
-        # Highlight own messages
-        if username == client['username']:
-            print(f"[{seq}] You: {cmd_text}")
-        else:
-            print(f"[{seq}] {username}: {cmd_text}")
-    except Exception as e:
-        print(f"Error processing command: {e}")
 
-def listen_for_broadcasts(client):
-    """Listen for broadcasts from the server
-    
-    Args:
-        client (dict): Client state
-    """
+        prefix = "You" if username == client["username"] else username
+        print(f"[{seq}] {prefix}: {cmd_text}")
+    except Exception as exc:
+        print(f"Error processing command: {exc}")
+
+
+def listen_for_broadcasts(client: dict) -> None:
+    """Background loop that decodes framed messages from the server."""
+    sock = client["socket"]
+    decoder: netcodec.NetDecoder = client["_decoder"]
+
     try:
-        # Buffer for incomplete messages
-        buffer = b""
-        
         while True:
-            try:
-                data = client['socket'].recv(config.BUFFER_SIZE)
-                if not data:
-                    print("\nDisconnected from server")
-                    break
-                
-                # Add to buffer
-                buffer += data
-                
-                try:
-                    # Try to parse the buffer as JSON
-                    message = json.loads(buffer.decode('utf-8'))
-                    buffer = b""  # Clear buffer after successful parse
-                    
-                    # Check if it's a history batch
-                    if isinstance(message, dict) and message.get("type") == "history_batch":
-                        print(f"Received history batch with {len(message.get('commands', []))} commands")
-                        # Process all commands in the batch
-                        for cmd in message.get("commands", []):
-                            process_command(client, cmd)
-                    else:
-                        # It's a regular command
-                        process_command(client, message)
-                    
-                except json.JSONDecodeError:
-                    # Incomplete message, wait for more data
-                    continue
-                
-            except json.JSONDecodeError as e:
-                print(f"Error decoding message: {e}")
-                buffer = b""  # Reset buffer on error
-            except socket.error as e:
-                print(f"\nNetwork error: {e}")
-                print("Disconnected from server.")
+            chunk = sock.recv(config.BUFFER_SIZE)
+            if not chunk:
+                print("\nDisconnected from server.")
                 break
-                
-    except Exception as e:
-        print(f"Error while listening for broadcasts: {e}")
 
-def append_command(client, ordered_command):
-    """Append the received command to the commands file
-    
-    Args:
-        client (dict): Client state
-        ordered_command (dict): Command with sequence number
-    """
+            for message in decoder.feed(chunk):
+                # History batch or single command
+                if isinstance(message, dict) and message.get("type") == "history_batch":
+                    cmds = message.get("commands", [])
+                    print(f"Received history batch of {len(cmds)} commands.")
+                    for cmd in cmds:
+                        process_command(client, cmd)
+                else:
+                    process_command(client, message)
+    except (socket.error, OSError) as exc:
+        print(f"\nNetwork error: {exc}")
+    except Exception as exc:
+        print(f"Listener failure: {exc}")
+
+
+# ---------------------------------------------------------------------------#
+# Internal helpers                                                           #
+# ---------------------------------------------------------------------------#
+
+
+def _append_command_to_file(client: dict, ordered_command: Any) -> None:
+    """Local persistence helper (append mode will be swapped in Issue 2)."""
+    import json, os
+
+    path = client["commands_path"]
     try:
-        # Read existing commands
-        with open(client['commands_path'], 'r') as f:
-            commands = json.load(f)
-        
-        # Append new command
-        commands.append(ordered_command)
-        
-        # Write back to file
-        with open(client['commands_path'], 'w') as f:
-            json.dump(commands, f, indent=2)
-            
-    except Exception as e:
-        print(f"Error appending to commands file: {e}")
+        # Read → mutate → write (will change in the next issue)
+        if os.path.exists(path):
+            with open(path, "r") as fh:
+                data = json.load(fh)
+        else:
+            data = []
+
+        data.append(ordered_command)
+        with open(path, "w") as fh:
+            json.dump(data, fh, indent=2)
+    except Exception as exc:
+        print(f"Error saving command to file: {exc}")
