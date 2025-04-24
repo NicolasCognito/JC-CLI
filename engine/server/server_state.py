@@ -4,43 +4,76 @@ import os
 import json
 import socket
 import threading
+import subprocess
+import platform
 from engine.core import config
 
 def get_local_ip_addresses():
-    """Get all local IP addresses of this machine
+    """Get all local IP addresses of this machine including virtual ones like ZeroTier
     
     Returns:
         list: List of IP addresses
     """
-    local_ips = []
+    local_ips = set()  # Use a set to avoid duplicates
+    
     try:
-        # Try connecting to an external server to determine route
+        # Method 1: Try hostname resolution which can detect virtual IPs
+        hostname = socket.gethostname()
+        try:
+            # This approach can find virtual network adapters
+            ip_addresses = socket.gethostbyname_ex(hostname)[2]
+            for ip in ip_addresses:
+                if not ip.startswith('127.') and ':' not in ip:
+                    local_ips.add(ip)
+        except socket.gaierror:
+            pass
+            
+        # Method 2: Try connecting to an external server to determine primary route
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             # This doesn't actually create a connection
             s.connect(('8.8.8.8', 1))
             local_ip = s.getsockname()[0]
-            local_ips.append(local_ip)
+            if not local_ip.startswith('127.'):
+                local_ips.add(local_ip)
         except Exception:
             pass
         finally:
             s.close()
-            
-        # If that didn't work, try hostname resolution
-        if not local_ips:
-            hostname = socket.gethostname()
-            ip_list = socket.getaddrinfo(hostname, None)
-            
-            for ip_info in ip_list:
-                ip = ip_info[4][0]
-                # Only include IPv4 addresses that aren't localhost
-                if not ip.startswith('127.') and ':' not in ip:
-                    local_ips.append(ip)
+        
+        # Method 3: For systems where ZeroTier IPs still aren't detected,
+        # try to get all network interfaces using platform-specific commands
+        system = platform.system()
+        if system == "Windows":
+            try:
+                # Use ipconfig on Windows
+                output = subprocess.check_output("ipconfig", shell=True).decode('utf-8')
+                for line in output.split('\n'):
+                    if "IPv4 Address" in line:
+                        ip = line.split(':')[-1].strip()
+                        if ip and not ip.startswith('127.'):
+                            local_ips.add(ip)
+            except Exception:
+                pass
+        elif system in ["Linux", "Darwin"]:  # Linux or macOS
+            try:
+                # Use ifconfig on Linux/Mac
+                cmd = "ifconfig" if system == "Darwin" else "ip addr"
+                output = subprocess.check_output(cmd, shell=True).decode('utf-8')
+                import re
+                # Simple regex to extract IPv4 addresses
+                pattern = r'inet (?:addr:)?(\d+\.\d+\.\d+\.\d+)'
+                ips = re.findall(pattern, output)
+                for ip in ips:
+                    if not ip.startswith('127.'):
+                        local_ips.add(ip)
+            except Exception:
+                pass
                 
     except Exception as e:
-        print(f"Warning: Could not determine local IP addresses: {e}")
+        print(f"Warning: Could not determine all local IP addresses: {e}")
     
-    return local_ips
+    return list(local_ips)  # Convert set back to list
 
 def initialize(session_dir=None):
     """Initialize server state
