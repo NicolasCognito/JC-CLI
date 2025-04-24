@@ -7,7 +7,7 @@ import platform
 import subprocess
 import shutil
 import json
-from . import config # Use relative import within the package
+from ... import config # Use relative import within the package
 
 def setup_directories():
     """Ensure required base directories exist and create default template"""

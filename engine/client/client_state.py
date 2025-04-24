@@ -3,7 +3,7 @@
 import os
 import json
 import socket
-from engine.core import config
+from . import config
 
 def initialize(client_dir=None, username=None, server_ip=None, server_port=None):
     """Initialize client state

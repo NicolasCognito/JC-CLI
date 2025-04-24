@@ -1,14 +1,37 @@
 # engine/client/client_network.py
 
+import shutil
 import os, json, socket
 from typing import Any
-from engine.core import config, netcodec
+from . import config
+from engine.core import netcodec
 
 # ---------------------------------------------------------------------------
 
 
 def connect(client: dict) -> bool:
     try:
+        # Reset command log and cursor files before connecting
+        commands_path = client["commands_path"]
+        cursor_path = os.path.join(client["data_dir"], config.CURSOR_FILE)
+        scripts_dir = os.path.join(client["client_dir"], "scripts")
+        
+        # Clear commands log file
+        open(commands_path, "w").close()
+        print("Command log file reset")
+        
+        # Reset cursor file to 0
+        with open(cursor_path, "w") as f:
+            f.write("0")
+        print("Cursor sequence reset to 0")
+
+        # Clear scripts directory if it exists
+        if os.path.exists(scripts_dir):
+            print(f"Clearing scripts directory: {scripts_dir}")
+            shutil.rmtree(scripts_dir)
+            os.makedirs(scripts_dir, exist_ok=True)
+        
+        # Proceed with connection
         host, port = client["server_host"], client["server_port"]
         print(f"Connecting to server at {host}:{port} …")
         client["socket"].connect((host, port))

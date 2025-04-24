@@ -2,7 +2,8 @@
 
 import json, os, time, base64
 from typing import Dict, Any
-from engine.core import config, netcodec
+from . import config
+from engine.core import netcodec
 
 # -------------------------------------------------------------------- #
 # Command flow

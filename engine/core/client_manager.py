@@ -5,7 +5,7 @@ import os
 import sys
 import json
 import shutil
-from . import config
+from ... import config
 from . import utils
 
 def join_session(session_name, client_name, server_ip=None):

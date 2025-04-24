@@ -2,7 +2,8 @@
 """Per‑client loop that now also replies to history page requests."""
 
 import socket, json
-from engine.core import config, netcodec
+from . import config
+from engine.core import netcodec
 from engine.server import command_processing
 
 

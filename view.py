@@ -19,7 +19,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Engine configuration
-from engine.core import config
+from . import config
 
 # ---------------------------------------------------------------------------
 # Discovery helpers

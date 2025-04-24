@@ -3,7 +3,7 @@
 import subprocess
 import sys
 import os
-from engine.core import config
+from . import config
 
 def start_sequencer(client):
     """Start the sequencer as a separate process

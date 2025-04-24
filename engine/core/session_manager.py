@@ -2,7 +2,9 @@
 """Session start / continue with manifest-driven snapshots."""
 
 import os, sys, json, shutil, base64
-from . import config, utils, snapshot
+
+from ... import config
+from . import utils, snapshot
 
 # ---------------------------------------------------------------------- #
 def _create_snapshots(template_dir: str, session_dir: str) -> bool:

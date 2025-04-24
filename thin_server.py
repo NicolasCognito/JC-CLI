@@ -4,7 +4,7 @@ JC-CLI Thin Server – updated for paged-history protocol
 """
 
 import argparse, os, sys, threading, socket
-from engine.core   import config
+from .   import config
 from engine.server import server_state, client_handling, command_processing
 
 # --------------------------------------------------------------------------- #

@@ -13,7 +13,7 @@ Manifest format (JSON):
 from __future__ import annotations
 import os, json, shutil, zipfile, hashlib
 from typing import List
-from . import config
+from ... import config
 
 # --------------------------------------------------------------------------- #
 def _read_manifest(path: str) -> List[str]:

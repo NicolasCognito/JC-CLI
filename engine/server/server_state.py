@@ -6,7 +6,7 @@ import socket
 import threading
 import subprocess
 import platform
-from engine.core import config
+from . import config
 
 def get_local_ip_addresses():
     """Get all local IP addresses of this machine including virtual ones like ZeroTier

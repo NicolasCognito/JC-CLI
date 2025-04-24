@@ -11,7 +11,7 @@ import shutil
 import zipfile
 import datetime
 from typing import Dict, List, Optional, Tuple, Any
-from . import config
+from ... import config
 
 # Constants
 PROJECTS_DIR = "projects"
