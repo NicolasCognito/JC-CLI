@@ -13,7 +13,7 @@ Exit codes
 ----------
 0  – at least one rule modified the world
 9  – no changes
-1+ – an error occurred
+1+ – an error occurred (raw error from script execution)
 """
 
 import json, sys, subprocess, pathlib, re
@@ -37,52 +37,67 @@ def _discover_rules(folder: pathlib.Path = RULES_DIR) -> dict[str, str]:
                         registry[m.group(1)] = str(path)
                     break
         except OSError:
-            pass
+            raise RuntimeError(f"Failed to read rule script at {path}")
     return registry
 
 RULES = _discover_rules()
 
 def _load_world() -> dict:
-    return json.loads(WORLD_FILE.read_text())
+    try:
+        return json.loads(WORLD_FILE.read_text())
+    except Exception as e:
+        # Let it fail: Don't catch and handle here
+        raise RuntimeError(f"Failed to load world data: {e}")
 
 def _save_world(world: dict):
-    WORLD_FILE.parent.mkdir(parents=True, exist_ok=True)
-    WORLD_FILE.write_text(json.dumps(world, indent=2))
+    try:
+        WORLD_FILE.parent.mkdir(parents=True, exist_ok=True)
+        WORLD_FILE.write_text(json.dumps(world, indent=2))
+    except Exception as e:
+        # Let it fail: Don't catch and handle here
+        raise RuntimeError(f"Failed to save world data: {e}")
 
 def _run_rule(rid: str, path: str, world: dict) -> tuple[dict, bool]:
-    try:
-        proc = subprocess.run(
-            [sys.executable, path],
-            input=json.dumps(world).encode(),
-            capture_output=True
-        )
-        new_world = json.loads(proc.stdout or b"{}")
-    except Exception as e:
-        print(f"Rule {rid} error: {e}")
-        return world, False
-
+    # Pass the world data as input to the rule script
+    # Allow exceptions to propagate up - don't catch them
+    proc = subprocess.run(
+        [sys.executable, path],
+        input=json.dumps(world).encode(),
+        capture_output=True,
+        check=True  # Will raise an exception on non-zero exit codes
+    )
+    
+    # Parse the output - any JSON errors will raise exceptions naturally
+    new_world = json.loads(proc.stdout)
+    
     if proc.returncode == 0:
         return new_world, True
     if proc.returncode == 9:
         return new_world, False
-
-    print(f"Rule {rid} exited with {proc.returncode}")
-    return new_world, False
+    
+    # Any other return code should not be reached due to check=True above
+    # Let the subprocess.CalledProcessError propagate
 
 def main():
     if not RULES:
-        print("No rules found.")
-        sys.exit(9)
+        # Don't just exit quietly - make it clear there are no rules
+        raise RuntimeError("No rules found. Check the RULES_DIR path.")
 
-    world  = _load_world()
+    world = _load_world()
     active = world.get("rules_in_power")
+    
+    # If no rules_in_power specified, use all discovered rules
+    if active is None:
+        active = list(RULES.keys())
+    
     changed = False
 
     for rid in active:
         path = RULES.get(rid)
         if not path:
-            print(f"Skipping missing rule: {rid}")
-            continue
+            # Don't silently skip - make it clear the rule is missing
+            raise RuntimeError(f"Rule '{rid}' specified in rules_in_power but script not found")
+        
         world, did = _run_rule(rid, path, world)
         changed |= did
 

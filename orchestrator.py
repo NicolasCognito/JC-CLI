@@ -12,7 +12,7 @@ Game-agnostic Orchestrator
 Exit codes
 ----------
 0  – command + rule loop succeeded
-1+ – an error occurred (details printed to console)
+1+ – an error occurred (script crashed or failed directly)
 """
 import os, sys, shlex, subprocess, json, re, pathlib
 
@@ -49,16 +49,16 @@ def _ensure_world():
 def _execute_command(cmd: str, argv: list[str]) -> bool:
     script = COMMANDS.get(cmd)
     if not script:
-        print(f"Unknown command: {cmd}")
-        return False
+        # No graceful message here - crash immediately with descriptive error
+        raise RuntimeError(f"Unknown command: {cmd}")
     if not os.path.exists(script):
-        print(f"Script not found: {script}")
-        return False
+        # No graceful message here - crash immediately with descriptive error
+        raise RuntimeError(f"Script not found: {script}")
+    
     print(f"→ {cmd} ► {script} {argv}")
-    rc = subprocess.run([sys.executable, script, *argv]).returncode
-    if rc != 0:
-        print(f"Command failed (exit {rc})")
-        return False
+    # Execute directly with check=True to raise CalledProcessError on failure
+    # This will provide a traceback with the actual failure reason
+    subprocess.run([sys.executable, script, *argv], check=True)
     return True
 
 def main():
@@ -77,14 +77,14 @@ def main():
     if cmd == "exit":
         sys.exit(0)
 
-    if _execute_command(cmd, argv):
-        rl = subprocess.run([sys.executable, RULE_LOOP_PY]).returncode
-        if rl not in (0, 9):
-            print(f"Rule loop failed (exit {rl})")
-            sys.exit(1)
-        sys.exit(0)
-    else:
-        sys.exit(1)
+    # Let errors propagate naturally - no try/except blocks
+    # The "Let It Fail" philosophy means we should see Python's full
+    # traceback and error state rather than a clean error message
+    _execute_command(cmd, argv)
+    
+    # Run rule loop without capturing output - let errors show directly
+    subprocess.run([sys.executable, RULE_LOOP_PY], check=True)
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

@@ -91,7 +91,8 @@ class Sequencer:
                     try:
                         cmd = json.loads(line)
                     except json.JSONDecodeError:
-                        continue
+                        # Let it fail: Propagate the error about invalid JSON
+                        raise RuntimeError(f"Invalid JSON in command log: {line}")
                     # skip already-handled
                     if cmd.get("seq") != next_seq:
                         continue
@@ -117,12 +118,13 @@ class Sequencer:
         if cmd_args:
             print(f"[Command:{seq}] Args: {cmd_args}")
 
-        result = subprocess.run(
+        # Run without capturing output - let errors propagate to console
+        # Remove returncode check and error handling - let subprocess exceptions show directly
+        subprocess.run(
             [sys.executable, self.orchestrator, text, user],
             cwd=self.client_dir,
+            check=True  # This will raise an exception on non-zero exit
         )
-        if result.returncode:
-            print(f"[Command:{seq}] '{cmd_name}' failed with code {result.returncode}")
 
 # ---------------------------------------------------------------------------#
 
