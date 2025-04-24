@@ -75,7 +75,7 @@ def main():
         sys.exit(9)
 
     world  = _load_world()
-    active = world.get("rules_in_power") or list(RULES.keys())
+    active = world.get("rules_in_power")
     changed = False
 
     for rid in active:

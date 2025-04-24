@@ -1,5 +1,4 @@
 # engine/server/command_processing.py
-"""Coordinator‑side sequence stamping and history paging."""
 
 import json, os, time, base64
 from typing import Dict, Any
@@ -26,21 +25,37 @@ def process_command(server: Dict, command: Dict):
 
         print(f"[{seq}] {command.get('username','?')}: {command.get('text','')}")
 
+
 # -------------------------------------------------------------------- #
 # Snapshot & history helpers
 
 
 def send_snapshot(server: Dict, sock):
-    """Unchanged from previous patch (streams client zip)."""
+    """Streams client zip, then sends the session’s initial world."""
     import base64
     zip_path = os.path.join(server["session_dir"], config.SNAPSHOT_DIR, config.CLIENT_ZIP_NAME)
     try:
+        # 1) send the client code snapshot ZIP
         with open(zip_path, "rb") as fh:
             blob = base64.b64encode(fh.read()).decode("ascii")
         packet = {"type": "snapshot_zip", "name": config.CLIENT_ZIP_NAME, "b64": blob}
         sock.sendall(netcodec.encode(packet))
     except Exception as exc:
         print("Snapshot send failed:", exc)
+
+    # 2) send the initial world JSON
+    world_path = os.path.join(server["session_dir"], config.INITIAL_WORLD_FILE)
+    try:
+        with open(world_path, "r", encoding="utf-8") as f:
+            world = json.load(f)
+        init_pkt = {
+            "type": "initial_world",
+            "world": world
+        }
+        sock.sendall(netcodec.encode(init_pkt))
+    except Exception as exc:
+        print("Initial world send failed:", exc)
+
 
 # -------------------------------------------------------------------- #
 # NEW: paged history
@@ -64,6 +79,7 @@ def send_history_page(server: Dict, sock, from_seq: int):
     page = [cmd for cmd in history if cmd.get("seq", 0) >= from_seq][:page_size]
     packet = {"type": "history_page", "commands": page}
     sock.sendall(netcodec.encode(packet))
+
 
 # -------------------------------------------------------------------- #
 # Internal helpers

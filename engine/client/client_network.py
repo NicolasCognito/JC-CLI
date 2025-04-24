@@ -1,5 +1,4 @@
 # engine/client/client_network.py
-"""Client‑side networking helpers – append‑only commands.log"""
 
 import os, json, socket
 from typing import Any
@@ -36,12 +35,14 @@ def send_command(client: dict, command_text: str) -> bool:
         print(f"Network error while sending: {exc}")
         return False
 
+
 # ---------------------------------------------------------------------------
-# Receiving                                                                 
+# Receiving                                                                  
 # ---------------------------------------------------------------------------
 
+
 def _append_command(client: dict, ordered: Any) -> None:
-    """Append newline‑delimited JSON to commands.log"""
+    """Append newline-delimited JSON to commands.log"""
     path = client["commands_path"]
     try:
         with open(path, "a", encoding="utf-8") as fh:
@@ -63,13 +64,16 @@ def process_command(client: dict, ordered_command: dict) -> None:
     except Exception as exc:
         print(f"Command processing error: {exc}")
 
+
 # ---------------------------------------------------------------------------#
+
 
 HISTORY_PAGE_SIZE = config.HISTORY_PAGE_SIZE
 
-# store these in client dict
+
 def listen_for_broadcasts(client: dict):
-    sock, dec = client["socket"], netcodec.NetDecoder()
+    sock = client["socket"]
+    dec = netcodec.NetDecoder()
     client["_history_high"] = None
     client["_next_seq_pull"] = 1
 
@@ -82,18 +86,33 @@ def listen_for_broadcasts(client: dict):
             for msg in dec.feed(chunk):
                 if isinstance(msg, dict):
                     typ = msg.get("type")
+
                     if typ == "snapshot_zip":
                         _handle_snapshot_zip(client, msg)
+
+                    elif typ == "initial_world":
+                        # new: write the initial world into data/world.json
+                        dst = os.path.join(client["data_dir"], config.WORLD_FILE)
+                        try:
+                            with open(dst, "w", encoding="utf-8") as f:
+                                json.dump(msg["world"], f, indent=2)
+                            print("Initial world received.")
+                        except Exception as exc:
+                            print("Failed to write initial world:", exc)
+
                     elif typ == "history_meta":
                         client["_history_high"] = msg["highest_seq"]
                         _request_history(client)
+
                     elif typ == "history_page":
                         for cmd in msg.get("commands", []):
                             process_command(client, cmd)
                             client["_next_seq_pull"] = cmd["seq"] + 1
                         _request_history(client)
+
                     elif "seq" in msg:
                         process_command(client, msg)
+
     except Exception as exc:
         print("Listener error:", exc)
 
