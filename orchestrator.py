@@ -59,7 +59,9 @@ def _execute_command(cmd: str, argv: list[str], username: str) -> bool:
     env = os.environ.copy()
     env["PLAYER"] = username
     
-    print(f"→ {cmd} ► {script} {argv}")
+    #print(f"→ {cmd} ► {script} {argv}")
+
+    print(f"-> {cmd} > {script} {argv}")
     # Run with full output captured and displayed, but don't use check=True
     # so we can still return a boolean success value
     result = subprocess.run([sys.executable, script, *argv], 

@@ -152,7 +152,8 @@ class ViewManager:
         try:
             while True:
                 try:
-                    line = input("✎ ")
+                    #line = input("✎ ")
+                    line = input("> ")
                 except EOFError:
                     break
                 self.handle_input(line)
