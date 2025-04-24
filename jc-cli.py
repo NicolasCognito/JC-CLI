@@ -67,6 +67,7 @@ def show_help():
     
     print("\nGeneral:")
     print("  help                                                               - Show this help message")
+    print("  delete-all [--force]                                               - Delete ALL sessions and clients")
     print("  exit                                                               - Exit the shell")
 
 def interactive_shell():
@@ -205,6 +206,10 @@ def interactive_shell():
             version_name = args[2]
             output_path = args[3]
             project_manager.export_version(project_name, version_name, output_path)
+
+        elif command == "delete-all":
+            force = "--force" in args
+            session_manager.delete_all_sessions_and_clients(force)
             
         else:
             print(f"Unknown command: {command}")
@@ -305,6 +310,10 @@ def main():
             version_name = args[2]
             output_path = args[3]
             project_manager.export_version(project_name, version_name, output_path)
+        
+        elif command == "delete-all":
+            force = "--force" in args
+            session_manager.delete_all_sessions_and_clients(force)
             
         elif command == "help":
              show_help()

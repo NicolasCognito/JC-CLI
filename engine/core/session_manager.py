@@ -77,3 +77,31 @@ def continue_session(session_name):
 
     print("Manual launch:", server_cmd)
     return False
+
+def delete_all_sessions_and_clients(force=False):
+    """Delete all sessions and clients completely."""
+    if not force:
+        confirm = input("WARNING: This will delete ALL sessions and clients. Continue? (y/N): ")
+        if confirm.lower() != 'y':
+            print("Operation canceled.")
+            return False
+    
+    try:
+        # Delete sessions directory
+        if os.path.exists(config.SESSIONS_DIR):
+            shutil.rmtree(config.SESSIONS_DIR)
+            print("All sessions deleted.")
+            
+        # Delete clients directory
+        clients_dir = "clients"  # This appears to be hardcoded in the codebase
+        if os.path.exists(clients_dir):
+            shutil.rmtree(clients_dir)
+            print("All clients deleted.")
+            
+        # Recreate empty directories
+        os.makedirs(config.SESSIONS_DIR, exist_ok=True)
+        
+        return True
+    except Exception as e:
+        print(f"Error during deletion: {e}")
+        return False
