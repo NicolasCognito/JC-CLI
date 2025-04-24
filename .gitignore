@@ -1,3 +1,5 @@
 archive/
 sessions/
 clients/
+*.pyc
+__pycache__/
