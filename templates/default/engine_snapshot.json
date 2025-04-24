@@ -1,6 +1,7 @@
 [
     "orchestrator.py",
     "rule_loop.py",
+    "view.py",
     "scripts"
 ]
   

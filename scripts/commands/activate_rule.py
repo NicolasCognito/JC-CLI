@@ -1,4 +1,4 @@
-name = "include"
+NAME = "include"
 
 #!/usr/bin/env python3
 """
@@ -31,18 +31,6 @@ def main():
     
     # Load the current world state
     world = load_world()
-    
-    # Get the rule map
-    rule_map = world.get("rule_map", {})
-    
-    # Check if the rule exists
-    if rule_id not in rule_map:
-        print(f"Error: Rule '{rule_id}' not found in rule map")
-        sys.exit(1)
-    
-    # Initialize rules_in_power if it doesn't exist
-    if "rules_in_power" not in world:
-        world["rules_in_power"] = list(rule_map.keys())
     
     # Check if the rule is already active
     if rule_id in world["rules_in_power"]:
