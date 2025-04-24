@@ -2,11 +2,11 @@
 """
 Game-agnostic Orchestrator
 
-• Recursively scans scripts/commands/** for Python files whose first line is
+- Recursively scans scripts/commands/** for Python files whose first line is
       NAME = "some_command"
   and builds a {command_name: script_path} registry.
 
-• When the player enters a command, the orchestrator looks it up in that
+- When the player enters a command, the orchestrator looks it up in that
   registry, runs the script in a subprocess, and then invokes rule_loop.py.
 
 Exit codes
@@ -46,7 +46,7 @@ def _ensure_world():
     if not WORLD_FILE.exists():
         WORLD_FILE.write_text(json.dumps({"counter": 0}, indent=2))
 
-def _execute_command(cmd: str, argv: list[str]) -> bool:
+def _execute_command(cmd: str, argv: list[str], username: str) -> bool:
     script = COMMANDS.get(cmd)
     if not script:
         print(f"ERROR! Unknown command: {cmd}")
@@ -55,11 +55,15 @@ def _execute_command(cmd: str, argv: list[str]) -> bool:
         print(f"ERROR! Script not found: {script}")
         return False
     
+    # Create a copy of the environment and add the player name
+    env = os.environ.copy()
+    env["PLAYER"] = username
+    
     print(f"→ {cmd} ► {script} {argv}")
     # Run with full output captured and displayed, but don't use check=True
     # so we can still return a boolean success value
     result = subprocess.run([sys.executable, script, *argv], 
-                           capture_output=True, text=True)
+                           env=env, capture_output=True, text=True)
     
     # Show both stdout and stderr regardless of success or failure
     if result.stdout:
@@ -77,6 +81,10 @@ def main():
 
     _ensure_world()
     raw = sys.argv[1]
+    
+    # Extract username from arguments or use default
+    username = sys.argv[2] if len(sys.argv) > 2 else "unknown_player"
+    
     args = shlex.split(raw)
     if not args:
         print("Empty command")
@@ -87,7 +95,7 @@ def main():
         sys.exit(0)
 
     # Execute the command, capturing the success/failure
-    command_success = _execute_command(cmd, argv)
+    command_success = _execute_command(cmd, argv, username)
     
     # Always run the rule loop, even if the command failed
     rule_result = subprocess.run([sys.executable, RULE_LOOP_PY], 
