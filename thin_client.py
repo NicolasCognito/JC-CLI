@@ -23,6 +23,7 @@ from engine.client import client_state
 from engine.client import client_network
 from engine.client import sequencer_control
 
+
 def main():
     """Main entry point"""
     # Parse command line arguments
@@ -32,7 +33,8 @@ def main():
     parser.add_argument("--server-ip", help="Server IP address", default=None)
     parser.add_argument("--server-port", help=f"Server port (default: {config.SERVER_PORT})",
                        type=int, default=config.SERVER_PORT)
-    parser.add_argument("--view", help="View script to use; omit to drop into CLI only", default=None)
+    parser.add_argument("--view", help="View script to use", default=None)
+    parser.add_argument("--no-view", help="Skip launching any view", action="store_true")
     args = parser.parse_args()
 
     # Set up client state
@@ -66,14 +68,15 @@ def main():
     Path(cmd_queue).touch(exist_ok=True)
     client['cmd_queue'] = cmd_queue
 
-    # If a view was requested, launch it; otherwise note we're in CLI-only mode
-    if args.view:
-        if start_view_in_new_window(client, args.view):
+    # Launch view unless explicitly disabled
+    if not args.no_view:
+        view_name = args.view or config.DEFAULT_VIEW
+        if start_view_in_new_window(client, view_name):
             print("View system started in a new window")
         else:
             print("Failed to start view system; continuing with CLI only")
     else:
-        print("No view requested; using built-in CLI only")
+        print("Running in CLI-only mode.")
 
     # Register cleanup
     atexit.register(cleanup, client)
@@ -103,8 +106,8 @@ def start_view_in_new_window(client, view_name):
             print(f"Error: View script not found at '{view_script}'")
             return False
 
-        view_cmd = f"{sys.executable} {view_script} --dir \"{client['client_dir']}\" "\
-                   f"--username \"{client['username']}\" --view {view_name} "\
+        view_cmd = f"{sys.executable} {view_script} --dir \"{client['client_dir']}\" " \
+                   f"--username \"{client['username']}\" --view {view_name} " \
                    f"--cmd-queue \"{client['cmd_queue']}\""
         title = f"JC-CLI View: {client['username']}"
         return utils.launch_in_new_terminal(view_cmd, title=title)
