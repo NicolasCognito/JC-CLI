@@ -91,12 +91,15 @@ class Sequencer:
                     try:
                         cmd = json.loads(line)
                     except json.JSONDecodeError:
-                        # Let it fail: Propagate the error about invalid JSON
-                        raise RuntimeError(f"Invalid JSON in command log: {line}")
+                        print(f"!!! ERROR: Invalid JSON in command log: {line}")
+                        # Continue processing, don't block on invalid JSON
+                        continue
+                        
                     # skip already-handled
                     if cmd.get("seq") != next_seq:
                         continue
 
+                    # Execute command and ALWAYS advance cursor, even on failure
                     self._execute(cmd)
                     self.cursor = next_seq
                     _write_cursor(self.cursor_file, self.cursor)
@@ -118,13 +121,25 @@ class Sequencer:
         if cmd_args:
             print(f"[Command:{seq}] Args: {cmd_args}")
 
-        # Run without capturing output - let errors propagate to console
-        # Remove returncode check and error handling - let subprocess exceptions show directly
-        subprocess.run(
+        # Execute without check=True, since we want to continue even if command fails
+        # Capture output to show it in raw form
+        result = subprocess.run(
             [sys.executable, self.orchestrator, text, user],
             cwd=self.client_dir,
-            check=True  # This will raise an exception on non-zero exit
+            capture_output=True,
+            text=True
         )
+        
+        # Show raw output, not sanitized error messages
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr)
+            
+        if result.returncode != 0:
+            print(f"!!! COMMAND FAILED: '{cmd_name}' (code {result.returncode})")
+        
+        # Note: We don't return anything because sequencer will continue regardless
 
 # ---------------------------------------------------------------------------#
 

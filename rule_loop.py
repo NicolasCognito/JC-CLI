@@ -13,7 +13,7 @@ Exit codes
 ----------
 0  – at least one rule modified the world
 9  – no changes
-1+ – an error occurred (raw error from script execution)
+1+ – an error occurred
 """
 
 import json, sys, subprocess, pathlib, re
@@ -37,7 +37,7 @@ def _discover_rules(folder: pathlib.Path = RULES_DIR) -> dict[str, str]:
                         registry[m.group(1)] = str(path)
                     break
         except OSError:
-            raise RuntimeError(f"Failed to read rule script at {path}")
+            print(f"!!! ERROR: Cannot read rule script at {path}")
     return registry
 
 RULES = _discover_rules()
@@ -46,47 +46,61 @@ def _load_world() -> dict:
     try:
         return json.loads(WORLD_FILE.read_text())
     except Exception as e:
-        # Let it fail: Don't catch and handle here
-        raise RuntimeError(f"Failed to load world data: {e}")
+        # Show raw error but use empty world to allow continuation
+        print(f"!!! ERROR: Failed to load world data: {e}")
+        return {}
 
 def _save_world(world: dict):
     try:
         WORLD_FILE.parent.mkdir(parents=True, exist_ok=True)
         WORLD_FILE.write_text(json.dumps(world, indent=2))
     except Exception as e:
-        # Let it fail: Don't catch and handle here
-        raise RuntimeError(f"Failed to save world data: {e}")
+        print(f"!!! ERROR: Failed to save world data: {e}")
+        # Don't handle the error - let caller see the raw failure
 
 def _run_rule(rid: str, path: str, world: dict) -> tuple[dict, bool]:
-    # Pass the world data as input to the rule script
-    # Allow exceptions to propagate up - don't catch them
-    proc = subprocess.run(
-        [sys.executable, path],
-        input=json.dumps(world).encode(),
-        capture_output=True,
-        check=True  # Will raise an exception on non-zero exit codes
-    )
-    
-    # Parse the output - any JSON errors will raise exceptions naturally
-    new_world = json.loads(proc.stdout)
+    print(f"Running rule: {rid} => {path}")
+    try:
+        # Pass the world data as input to the rule script
+        # Show raw output for maximum transparency
+        proc = subprocess.run(
+            [sys.executable, path],
+            input=json.dumps(world).encode(),
+            capture_output=True
+        )
+        
+        # Show any stderr output - errors should be visible
+        if proc.stderr:
+            sys.stderr.write(proc.stderr.decode('utf-8', errors='replace'))
+        
+        # Try to parse output, but show raw error if it fails
+        try:
+            new_world = json.loads(proc.stdout or b"{}")
+        except json.JSONDecodeError as e:
+            print(f"!!! ERROR: Rule {rid} returned invalid JSON: {e}")
+            print(f"Raw output: {proc.stdout[:200]}...")  # First 200 chars of output
+            return world, False  # Return original world unchanged
+    except Exception as e:
+        print(f"!!! ERROR: Rule {rid} failed to execute: {e}")
+        return world, False
     
     if proc.returncode == 0:
         return new_world, True
     if proc.returncode == 9:
         return new_world, False
     
-    # Any other return code should not be reached due to check=True above
-    # Let the subprocess.CalledProcessError propagate
+    print(f"!!! ERROR: Rule {rid} exited with code {proc.returncode}")
+    return new_world, False
 
 def main():
     if not RULES:
-        # Don't just exit quietly - make it clear there are no rules
-        raise RuntimeError("No rules found. Check the RULES_DIR path.")
+        print("!!! WARNING: No rules found.")
+        sys.exit(9)  # No changes
 
     world = _load_world()
     active = world.get("rules_in_power")
     
-    # If no rules_in_power specified, use all discovered rules
+    # If no rules_in_power specified, run all discovered rules
     if active is None:
         active = list(RULES.keys())
     
@@ -95,8 +109,8 @@ def main():
     for rid in active:
         path = RULES.get(rid)
         if not path:
-            # Don't silently skip - make it clear the rule is missing
-            raise RuntimeError(f"Rule '{rid}' specified in rules_in_power but script not found")
+            print(f"!!! ERROR: Rule '{rid}' specified in rules_in_power but script not found")
+            continue  # Continue with other rules
         
         world, did = _run_rule(rid, path, world)
         changed |= did

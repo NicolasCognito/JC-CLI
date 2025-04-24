@@ -12,7 +12,7 @@ Game-agnostic Orchestrator
 Exit codes
 ----------
 0  – command + rule loop succeeded
-1+ – an error occurred (script crashed or failed directly)
+1+ – an error occurred (details printed to console)
 """
 import os, sys, shlex, subprocess, json, re, pathlib
 
@@ -49,17 +49,26 @@ def _ensure_world():
 def _execute_command(cmd: str, argv: list[str]) -> bool:
     script = COMMANDS.get(cmd)
     if not script:
-        # No graceful message here - crash immediately with descriptive error
-        raise RuntimeError(f"Unknown command: {cmd}")
+        print(f"ERROR! Unknown command: {cmd}")
+        return False
     if not os.path.exists(script):
-        # No graceful message here - crash immediately with descriptive error
-        raise RuntimeError(f"Script not found: {script}")
+        print(f"ERROR! Script not found: {script}")
+        return False
     
     print(f"→ {cmd} ► {script} {argv}")
-    # Execute directly with check=True to raise CalledProcessError on failure
-    # This will provide a traceback with the actual failure reason
-    subprocess.run([sys.executable, script, *argv], check=True)
-    return True
+    # Run with full output captured and displayed, but don't use check=True
+    # so we can still return a boolean success value
+    result = subprocess.run([sys.executable, script, *argv], 
+                           capture_output=True, text=True)
+    
+    # Show both stdout and stderr regardless of success or failure
+    if result.stdout:
+        sys.stdout.write(result.stdout)
+    if result.stderr:
+        sys.stderr.write(result.stderr)
+    
+    # Return success/failure based on exit code
+    return result.returncode == 0
 
 def main():
     if len(sys.argv) < 2:
@@ -77,13 +86,28 @@ def main():
     if cmd == "exit":
         sys.exit(0)
 
-    # Let errors propagate naturally - no try/except blocks
-    # The "Let It Fail" philosophy means we should see Python's full
-    # traceback and error state rather than a clean error message
-    _execute_command(cmd, argv)
+    # Execute the command, capturing the success/failure
+    command_success = _execute_command(cmd, argv)
     
-    # Run rule loop without capturing output - let errors show directly
-    subprocess.run([sys.executable, RULE_LOOP_PY], check=True)
+    # Always run the rule loop, even if the command failed
+    rule_result = subprocess.run([sys.executable, RULE_LOOP_PY], 
+                               capture_output=True, text=True)
+    
+    # Show rule loop output
+    if rule_result.stdout:
+        sys.stdout.write(rule_result.stdout)
+    if rule_result.stderr:
+        sys.stderr.write(rule_result.stderr)
+    
+    # Exit with success only if both command and rules succeeded
+    # But we've already displayed all error information
+    if not command_success:
+        print(f"ERROR! Command '{cmd}' failed")
+        sys.exit(1)
+    elif rule_result.returncode not in (0, 9):
+        print(f"ERROR! Rule loop failed with code {rule_result.returncode}")
+        sys.exit(1)
+    
     sys.exit(0)
 
 if __name__ == "__main__":
