@@ -7,7 +7,7 @@ import platform
 import subprocess
 import shutil
 import json
-import config # Use relative import within the package
+import config  # Use relative import within the package
 
 def setup_directories():
     """Ensure required base directories exist and create default template"""
@@ -23,7 +23,6 @@ def setup_directories():
     if not os.path.exists(default_template_initial_world_file):
         # Create a simple default template world
         with open(default_template_initial_world_file, 'w') as f:
-            # Original template content
             json.dump({
                 "counter": 0,
                 "rule_map": {
@@ -32,29 +31,20 @@ def setup_directories():
             }, f, indent=2)
         print(f"Created default template at {default_template_initial_world_file}")
 
-
 def copy_directory(src, dst):
     """Copy a directory recursively"""
     if not os.path.exists(src):
         print(f"Warning: Source directory {src} not found")
         return False
-
     try:
-        # Create destination if it doesn't exist
         os.makedirs(dst, exist_ok=True)
-
-        # Copy contents
         for item in os.listdir(src):
             src_item = os.path.join(src, item)
             dst_item = os.path.join(dst, item)
-
             if os.path.isdir(src_item):
-                # Recursive copy for directories
                 copy_directory(src_item, dst_item)
             else:
-                # Copy files
                 shutil.copy2(src_item, dst_item)
-
         return True
     except Exception as e:
         print(f"Error copying directory: {e}")
@@ -118,3 +108,25 @@ def launch_in_new_terminal(cmd, title=None):
         print(f"Error launching terminal: {e}")
         print(f"Please run this command manually in directory '{cwd}': {cmd}")
         return False
+
+# ──────────────────────────────────────────────────────────────────────────────
+
+def clear_client_state(commands_path: str, cursor_path: str, scripts_dir: str) -> None:
+    """
+    Clear the client’s command log, reset the cursor file to zero,
+    and wipe & recreate the scripts directory.
+    """
+    # Clear commands log file
+    open(commands_path, "w").close()
+    print("Command log file reset")
+
+    # Reset cursor file to 0
+    with open(cursor_path, "w") as f:
+        f.write("0")
+    print("Cursor sequence reset to 0")
+
+    # Clear scripts directory if it exists
+    if os.path.exists(scripts_dir):
+        print(f"Clearing scripts directory: {scripts_dir}")
+        shutil.rmtree(scripts_dir)
+    os.makedirs(scripts_dir, exist_ok=True)

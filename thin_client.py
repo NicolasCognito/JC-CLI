@@ -50,10 +50,11 @@ def main():
 
     print(f"Connected to server at {client['server_host']}:{client['server_port']}")
 
-    # Send any initial commands
-    cmd = config.INITIAL_COMMAND
-    print(f"→ Automatically sending initial command: {cmd}")
-    client_network.send_command(client, cmd)
+    if(config.SEND_INITIAL):
+        # Send any initial commands
+        cmd = config.INITIAL_COMMAND
+        print(f"→ Automatically sending initial command: {cmd}")
+        client_network.send_command(client, cmd)
 
     # Start the sequencer process
     if not sequencer_control.start_sequencer(client):

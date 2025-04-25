@@ -28,8 +28,6 @@ SERVER_PORT         = 9000
 BUFFER_SIZE         = 4096
 FRAME_HEADER_BYTES  = 4
 HISTORY_PAGE_SIZE   = 200 
-INITIAL_COMMAND    = "client_joined"
-DISCONNECT_COMMAND  = "client_disconnected"
 
 
 # ------------- entry scripts -------------------
@@ -40,3 +38,10 @@ CLIENT_SCRIPT       = "thin_client.py"
 SEQUENCER_SCRIPT    = "sequencer.py"
 SCRIPTS_DIR         = "scripts"
 DEFAULT_VIEW        = "default"
+
+# ---------- command keywords ----------
+RESET_COMMAND      = "reset"
+SEND_INITIAL       = True
+INITIAL_COMMAND    = "client_joined"
+SEND_DISCONNECT    = True
+DISCONNECT_COMMAND = "client_disconnected"

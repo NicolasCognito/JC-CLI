@@ -44,8 +44,8 @@ def handle_client(server, sock: socket.socket, addr):
         sock.close()
         print("Connection closed:", addr)
         
-        # Broadcast disconnect message if we know the username
-        if client_username:
+        # Broadcast disconnect message
+        if (config.SEND_DISCONNECT):
             disconnect_msg = {
                 "username": client_username, 
                 "text": config.DISCONNECT_COMMAND
