@@ -5,6 +5,7 @@ import os, json, socket
 from typing import Any
 import config
 from engine.core import netcodec
+from engine.core.utils import clear_client_state
 
 # ---------------------------------------------------------------------------
 
@@ -16,21 +17,9 @@ def connect(client: dict) -> bool:
         cursor_path = os.path.join(client["data_dir"], config.CURSOR_FILE)
         scripts_dir = os.path.join(client["client_dir"], "scripts")
         
-        # Clear commands log file
-        open(commands_path, "w").close()
-        print("Command log file reset")
-        
-        # Reset cursor file to 0
-        with open(cursor_path, "w") as f:
-            f.write("0")
-        print("Cursor sequence reset to 0")
+        # Clear local state using shared utility
+        clear_client_state(commands_path, cursor_path, scripts_dir)
 
-        # Clear scripts directory if it exists
-        if os.path.exists(scripts_dir):
-            print(f"Clearing scripts directory: {scripts_dir}")
-            shutil.rmtree(scripts_dir)
-            os.makedirs(scripts_dir, exist_ok=True)
-        
         # Proceed with connection
         host, port = client["server_host"], client["server_port"]
         print(f"Connecting to server at {host}:{port} …")
