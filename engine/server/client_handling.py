@@ -47,7 +47,7 @@ def handle_client(server, sock: socket.socket, addr):
         # Broadcast disconnect message if we know the username
         if client_username:
             disconnect_msg = {
-                "username": "client_username", 
+                "username": client_username, 
                 "text": config.DISCONNECT_COMMAND
             }
             command_processing.process_command(server, disconnect_msg)
