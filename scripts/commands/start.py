@@ -48,6 +48,12 @@ for seat in world["seats"]:
         seat["total_bet_this_round"] = 0
         seat["has_acted"] = False
         seat["is_folded"] = False
+        # Clear showdown information
+        seat["combo"] = None
+        seat["combo_rank"] = None
+        seat["combo_cards"] = []
+        if "is_winner" in seat:
+            del seat["is_winner"]
 
 # Increment hand ID
 world["metadata"]["current_hand_id"] += 1

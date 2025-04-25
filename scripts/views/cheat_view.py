@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Default poker game view
-NAME = "default"
+NAME = "cheat"
 
 def render(world, context):
     """Render the poker game state"""
@@ -86,15 +86,10 @@ def render(world, context):
             # Show cards based on game state
             cards = seat.get("cards", [])
             if cards:
-                if player_id == username or phase == "showdown":
-                    # Show this player's cards if it's the viewer or if we're in showdown
-                    card_str = []
-                    for card_id in cards:
-                        card_str.append(format_card(card_id))
-                    line += f" - Cards: {' '.join(card_str)}"
-                else:
-                    # Show hidden cards for other players
-                    line += f" - Cards: [🃏 🃏]"
+                card_str = []
+                for card_id in cards:
+                    card_str.append(format_card(card_id))
+                line += f" - Cards: {' '.join(card_str)}"
                     
             print(line)
             

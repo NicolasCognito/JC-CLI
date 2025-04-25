@@ -2,7 +2,7 @@
   "metadata": {
     "game_name": "Poker",
     "game_type": "texas_holdem",
-    "session_seed": "PokerQuest",
+    "session_seed": "",
     "min_players": 2,
     "max_players": 9,
     "small_blind": 5,
@@ -67,15 +67,15 @@
   "deck": [],
   "board": [],
   "seats": [
-    {"position": 0, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 1, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 2, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 3, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 4, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 5, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 6, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 7, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false},
-    {"position": 8, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false}
+    {"position": 0, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 1, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 2, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 3, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 4, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 5, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 6, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 7, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []},
+    {"position": 8, "player_id": null, "cards": [], "current_bet": 0, "total_bet_this_round": 0, "has_acted": false, "is_folded": false, "combo": null, "combo_rank": null, "combo_cards": []}
   ],
   "game_state": {
     "phase": "waiting",
