@@ -3,3 +3,7 @@ sessions/
 clients/
 *.pyc
 __pycache__/
+engine/core/__pycache__/
+engine/client/__pycache__/
+engine/server/__pycache__/
+engine/__pycache__/
