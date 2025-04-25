@@ -36,7 +36,7 @@ import sys
 import shlex
 # Use absolute imports assuming 'engine' is a package in the current directory
 # or accessible via PYTHONPATH
-from . import config
+import config
 from engine.core import utils
 from engine.core import session_manager
 from engine.core import client_manager

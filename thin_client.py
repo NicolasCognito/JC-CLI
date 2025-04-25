@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 # Import modules from engine
-from . import config
+import config
 from engine.core import utils
 from engine.client import client_state
 from engine.client import client_network

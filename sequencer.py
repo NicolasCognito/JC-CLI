@@ -7,7 +7,7 @@ Processes commands in strict sequence, exactly once.
 import os, sys, json, time, argparse, shlex, subprocess, threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from . import config
+import config
 
 # ---------------------------------------------------------------------------#
 # Helper: read/write cursor                                                  #
