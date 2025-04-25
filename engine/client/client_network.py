@@ -3,7 +3,7 @@
 import shutil
 import os, json, socket
 from typing import Any
-from . import config
+import config
 from engine.core import netcodec
 
 # ---------------------------------------------------------------------------
