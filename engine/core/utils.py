@@ -52,7 +52,62 @@ def copy_directory(src, dst):
 
 def launch_in_new_terminal(cmd, title=None):
     """Launch a command in a new terminal window based on OS"""
-    # … existing code …
+    system = platform.system()
+    cwd = os.getcwd() # Get current working directory to ensure scripts run from the correct context
+
+    try:
+        if system == "Windows":
+            # Fixed Windows title handling
+            if title:
+                # Using the Start command directly which handles titles properly
+                subprocess.Popen(
+                    f'start "{title}" powershell -NoExit -Command "cd \'{cwd}\'; {cmd}"',
+                    shell=True
+                )
+            else:
+                # No title specified
+                subprocess.Popen(
+                    f'start powershell -NoExit -Command "cd \'{cwd}\'; {cmd}"',
+                    shell=True
+                )
+
+        elif system == "Darwin":  # macOS
+            # Original AppleScript approach
+            apple_cmd = f'cd \\"{cwd}\\"; {cmd}' # Command needs escaping for AppleScript string
+            window_title_arg = f' with title "{title}"' if title else ""
+            osa_script = f'tell app "Terminal" to do script "{apple_cmd}"{window_title_arg}'
+            subprocess.Popen(["osascript", "-e", osa_script])
+
+        elif system == "Linux":
+            # Try common terminals, adapting original logic
+            try:
+                # gnome-terminal
+                term_cmd = ["gnome-terminal"]
+                if title: term_cmd.extend([f"--title={title}"])
+                term_cmd.extend(["--", "bash", "-c", f'cd "{cwd}" && {cmd}; exec bash'])
+                subprocess.Popen(term_cmd)
+            except FileNotFoundError:
+                try:
+                    # xterm fallback
+                    term_cmd = ["xterm"]
+                    if title: term_cmd.extend(["-T", title])
+                    term_cmd.extend(["-e", f'bash -c \'cd "{cwd}" && {cmd}; exec bash\'']) # Ensure inner command is quoted for -e
+                    subprocess.Popen(term_cmd)
+                except FileNotFoundError:
+                     print(f"Could not find gnome-terminal or xterm. Please run manually.")
+                     print(f"Command: cd \"{cwd}\" && {cmd}")
+                     return False
+        else:
+            print(f"Unsupported OS: {system}")
+            print(f"Please run this command manually in directory '{cwd}': {cmd}")
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"Error launching terminal: {e}")
+        print(f"Please run this command manually in directory '{cwd}': {cmd}")
+        return False
 
 # ──────────────────────────────────────────────────────────────────────────────
 
