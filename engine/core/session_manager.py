@@ -3,7 +3,7 @@
 
 import os, sys, json, shutil, base64
 
-from ... import config
+import config
 from . import utils, snapshot
 
 # ---------------------------------------------------------------------- #
