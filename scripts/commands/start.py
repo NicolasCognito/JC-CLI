@@ -5,21 +5,14 @@ NAME = "start"
 import json
 import sys
 import random
+import os
 
 # Load the world state
 with open("data/world.json", "r") as f:
     world = json.load(f)
 
-# Get player who issued the command
-player = sys.argv[1] if len(sys.argv) > 1 else "unknown"
-
-# Check if game is in the ready state
-if world["game_state"]["phase"] != "ready_to_start":
-    if world["game_state"]["phase"] == "waiting":
-        print("Not enough players to start the game")
-    else:
-        print("Game is already in progress")
-    sys.exit(1)
+# Get player who issued the command from environment variable
+player = os.environ.get("PLAYER", "unknown")
 
 # Count active players
 active_players = sum(1 for seat in world["seats"] if seat["player_id"] is not None)
@@ -27,9 +20,20 @@ if active_players < world["metadata"]["min_players"]:
     print(f"Need at least {world['metadata']['min_players']} players to start")
     sys.exit(1)
 
+# Check if game is in a valid state to start
+current_phase = world["game_state"]["phase"]
+if current_phase not in ["waiting", "ready_to_start", "showdown"]:
+    print(f"Cannot start game during {current_phase} phase")
+    sys.exit(1)
+
 # Initialize the deck with all cards
 seed = world["metadata"]["session_seed"]
-random.seed(seed + str(world["metadata"]["current_hand_id"]))
+if not seed:
+    # Generate a new seed if one doesn't exist
+    seed = ''.join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10))
+    world["metadata"]["session_seed"] = seed
+
+random.seed(seed + str(world["metadata"]["current_hand_id"] + 1))
 world["deck"] = list(world["card_definitions"].keys())
 random.shuffle(world["deck"])
 
@@ -59,17 +63,22 @@ active_positions = [seat["position"] for seat in world["seats"] if seat["player_
 active_positions.sort()  # Sort for predictability
 
 # Set dealer position - for first hand, it's the first seat, otherwise it rotates
-if world["metadata"]["current_hand_id"] == 1:
+if world["metadata"]["current_hand_id"] <= 1:
+    # First hand
     world["game_state"]["dealer_position"] = active_positions[0]
 else:
     # Find next active position after dealer
     current_dealer = world["game_state"]["dealer_position"]
-    next_index = 0
+    next_dealer_index = 0
+    
+    # Find the index of the next dealer in active_positions
     for i, pos in enumerate(active_positions):
         if pos > current_dealer:
-            next_index = i
+            next_dealer_index = i
             break
-    world["game_state"]["dealer_position"] = active_positions[next_index % len(active_positions)]
+    
+    # Set new dealer position
+    world["game_state"]["dealer_position"] = active_positions[next_dealer_index % len(active_positions)]
 
 # Set blinds positions
 dealer_index = active_positions.index(world["game_state"]["dealer_position"])

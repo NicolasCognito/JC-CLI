@@ -70,16 +70,20 @@ def render(world, context):
             if status:
                 line += f" - {status}"
                 
-            # If this is the current player, show their cards
-            if player_id == username:
-                cards = seat.get("cards", [])
-                if cards:
+            # Show cards based on game state
+            cards = seat.get("cards", [])
+            if cards:
+                # Show this player's cards if it's the viewer or if we're in showdown
+                if player_id == username or phase == "showdown":
                     card_str = []
                     for card_id in cards:
                         card = world.get("card_definitions", {}).get(card_id, {})
                         if card:
                             card_str.append(f"{card['rank']}{card['suit'][0]}")
                     line += f" - Cards: {' '.join(card_str)}"
+                else:
+                    # Show hidden cards for other players
+                    line += f" - Cards: [🃏 🃏]"
                     
             print(line)
         else:
@@ -87,8 +91,11 @@ def render(world, context):
     
     # Show available commands based on game state
     print("\nCommands:")
-    if phase == "waiting" or phase == "ready_to_start":
+    if phase == "waiting":
         print("  join <position> - Join the game at a seat")
+        if sum(1 for seat in seats if seat["player_id"] is not None) >= 2:
+            print("  start - Start the game (when 2+ players ready)")
+    elif phase == "ready_to_start":
         print("  start - Start the game (when 2+ players ready)")
     elif phase == "showdown":
         print("  start - Start a new hand")
