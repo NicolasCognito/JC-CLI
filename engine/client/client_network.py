@@ -4,7 +4,8 @@ import shutil
 import os, json, socket
 from typing import Any
 import config
-from engine.core import netcodec
+from engine.core import netcodec, utils
+from engine.client import sequencer_control      # restart helper
 from engine.core.utils import clear_client_state
 
 # ---------------------------------------------------------------------------
@@ -111,6 +112,9 @@ def listen_for_broadcasts(client: dict):
                             print("Initial world received.")
                         except Exception as exc:
                             print("Failed to write initial world:", exc)
+                    # ───────── RESET – blank client and re-seed world ───────
+                    elif typ == "reset":
+                        _handle_reset(client, msg)          # NEW
 
                     elif typ == "history_meta":
                         client["_history_high"] = msg["highest_seq"]
@@ -127,6 +131,40 @@ def listen_for_broadcasts(client: dict):
 
     except Exception as exc:
         print("Listener error:", exc)
+
+# ---------------------------------------------------------------------------#
+# RESET helper                                                               #
+# ---------------------------------------------------------------------------#
+
+def _handle_reset(client: dict, msg: dict):
+    """Clear local history/cursor, restart sequencer, write fresh world."""
+    print("\n=== SESSION RESET received — returning to initial state ===")
+
+    # 1) nuke log + cursor
+    commands = client["commands_path"]
+    cursor   = os.path.join(client["data_dir"], config.CURSOR_FILE)
+    scripts  = os.path.join(client["client_dir"], "scripts")
+    utils.clear_client_state(commands, cursor, scripts)
+
+    # 2) drop the running sequencer and spin a new one
+    sequencer_control.cleanup(client)
+    sequencer_control.start_sequencer(client)
+
+    # 3) write new world
+    dst = os.path.join(client["data_dir"], config.WORLD_FILE)
+    with open(dst, "w", encoding="utf-8") as fh:
+        json.dump(msg["world"], fh, indent=2)
+
+    # 4) reset history-pull helpers
+    client["_history_high"]  = None
+    client["_next_seq_pull"] = 1
+
+    # 5) re-emit INITIAL_COMMAND so per-client init runs on the fresh world
+    try:
+        send_command(client, config.INITIAL_COMMAND)
+        print(f"Re-sent INITIAL_COMMAND: {config.INITIAL_COMMAND}")
+    except Exception as exc:
+        print("Could not send INITIAL_COMMAND after reset:", exc)
 
 
 def _request_history(client):

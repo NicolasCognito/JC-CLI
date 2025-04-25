@@ -40,3 +40,6 @@ CLIENT_SCRIPT       = "thin_client.py"
 SEQUENCER_SCRIPT    = "sequencer.py"
 SCRIPTS_DIR         = "scripts"
 DEFAULT_VIEW        = "default"
+
+# ---------- command keywords ----------
+RESET_COMMAND      = "reset"  

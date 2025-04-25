@@ -2,6 +2,7 @@
 
 import json, os, time, base64
 from typing import Dict, Any
+import threading          # helper for broadcast
 import config
 from engine.core import netcodec
 
@@ -10,7 +11,14 @@ from engine.core import netcodec
 
 
 def process_command(server: Dict, command: Dict):
-    """Assign global order and broadcast."""
+    """Assign global order and broadcast.
+       Special-case the hard-coded RESET command."""
+
+    # ── 0.  Hard-wired reset ──────────────────────────────────────────
+    if command.get("text") == config.RESET_COMMAND:          # new
+        _reset_session(server)                               # new
+        return                                               # new
+
     with server["lock"]:
         server["sequence_number"] += 1
         seq = server["sequence_number"]
@@ -26,13 +34,38 @@ def process_command(server: Dict, command: Dict):
 
         print(f"[{seq}] {command.get('username','?')}: {command.get('text','')}")
 
+# ───────────────────────────────────────────────────────────────────────
+# RESET helper
+# -------------------------------------------------------------------- #
+
+def _reset_session(server: Dict):
+    """Wipe history & resend the template world to everyone."""
+    with server["lock"]:
+        # 1) blank history  …………………………………………………………………………………
+        with open(server["history_path"], "w") as fh:
+            json.dump([], fh)
+        server["sequence_number"] = 0
+
+        # 2) load initial world  ………………………………………………………………………………
+        init_path = os.path.join(
+            server["session_dir"], config.INITIAL_WORLD_FILE
+        )
+        with open(init_path, "r", encoding="utf-8") as fh:
+            world = json.load(fh)
+
+        # 3) broadcast reset packet ………………………………………………………………………
+        pkt = {"type": "reset", "world": world}
+        _broadcast(server, pkt)
+
+        print("=== SESSION RESET issued by host ===")
+
 
 # -------------------------------------------------------------------- #
 # Snapshot & history helpers
 
 
 def send_snapshot(server: Dict, sock):
-    """Streams client zip, then sends the session’s initial world."""
+    """Streams client zip, then sends the session's initial world."""
     import base64
     zip_path = os.path.join(server["session_dir"], config.SNAPSHOT_DIR, config.CLIENT_ZIP_NAME)
     try:
