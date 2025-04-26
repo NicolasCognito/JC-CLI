@@ -1,66 +1,65 @@
 #!/usr/bin/env python3
-# Chess board view
-NAME = "chess"
+NAME = "chess_pil"
+
+from io import BytesIO
+import os
+from PIL import Image, ImageDraw, ImageFont
+from rich.console import Console
+from rich.image import Image as RichImage
+from rich.panel import Panel
+from rich.text import Text
+
+console = Console()
+
+# board drawing constants
+S = 64  # pixel size per square
+LIGHT, DARK = (240,217,181), (181,136, 99)
+FONT = ImageFont.truetype("DejaVuSans.ttf", 48)
+PIECES = {
+    "WK":"♔","WQ":"♕","WR":"♖","WB":"♗","WN":"♘","WP":"♙",
+    "BK":"♚","BQ":"♛","BR":"♜","BB":"♝","BN":"♞","BP":"♟","":""
+}
+
+def make_board(world):
+    img = Image.new("RGB", (8*S, 8*S), LIGHT)
+    draw = ImageDraw.Draw(img)
+    board = world["board"]
+    for r in range(8):
+        for c in range(8):
+            color = LIGHT if (r+c)%2==0 else DARK
+            x, y = c*S, (7-r)*S
+            draw.rectangle([x,y,x+S,y+S], fill=color)
+            piece = board[r][c]
+            glyph = PIECES.get(piece, "")
+            if glyph:
+                w,h = draw.textsize(glyph, font=FONT)
+                fill = "black" if piece.startswith("B") else "white"
+                draw.text(
+                    (x+(S-w)/2, y+(S-h)/2),
+                    glyph, font=FONT, fill=fill
+                )
+    return img
 
 def render(world, context):
-    """Render the chess board and game state"""
-    username = context.get("username", "observer")
-    player_color = "white" if username == "player1" else "black"
-    
-    # Unicode chess pieces
-    pieces = {
-        "WK": "♔", "WQ": "♕", "WR": "♖", "WB": "♗", "WN": "♘", "WP": "♙",
-        "BK": "♚", "BQ": "♛", "BR": "♜", "BB": "♝", "BN": "♞", "BP": "♟",
-        "": " "
-    }
-    
-    board = world["board"]
-    current_turn = world["current_turn"]
-    game_state = world["game_state"]
-    
-    # Print game header
-    print(f"\n=== Chess Game [{username}] ===")
-    print(f"Current turn: {current_turn.upper()}")
-    print(f"Game state: {game_state.upper()}")
-    
-    # Print the board
-    print("\n    a b c d e f g h")
-    print("  +-----------------+")
-    
-    # Flip board for black player's view
-    rows = range(8) if player_color == "white" else range(7, -1, -1)
-    
-    for i in rows:
-        rank = 8 - i if player_color == "white" else i + 1
-        print(f"{rank} | ", end="")
-        
-        cols = range(8) if player_color == "white" else range(7, -1, -1)
-        for j in cols:
-            piece = board[i][j]
-            print(f"{pieces[piece]} ", end="")
-        
-        print(f"| {rank}")
-    
-    print("  +-----------------+")
-    print("    a b c d e f g h\n")
-    
-    # Print captured pieces
-    white_captured = " ".join(pieces[p] for p in world["captured_pieces"]["white"])
-    black_captured = " ".join(pieces[p] for p in world["captured_pieces"]["black"])
-    
-    print("Pieces captured by White:", white_captured or "None")
-    print("Pieces captured by Black:", black_captured or "None")
-    
-    # Print last few moves from history
-    print("\nMove history:")
-    last_moves = world["move_history"][-5:] if len(world["move_history"]) > 5 else world["move_history"]
-    for i, move in enumerate(last_moves):
-        move_num = len(world["move_history"]) - len(last_moves) + i + 1
-        print(f"{move_num}. {move}")
-    
-    # Print available commands
-    print("\nCommands:")
-    print("move <from> <to>    - Move a piece (e.g., 'move e2 e4')")
-    print("castle kingside     - Castle on the kingside")
-    print("castle queenside    - Castle on the queenside")
-    print("view chess          - Show the chess board")
+    # --- 1) clear happens in view.py before this is called ---
+    # --- 2) build our PIL board ---
+    img = make_board(world)
+
+    # --- 3) print it via RichImage (auto ANSI‐block conversion) ---
+    console.print(RichImage.from_pil(img, width=32))
+
+    # --- 4) then print the rest exactly as you used to ---
+    white_cap = " ".join(world["captured_pieces"]["white"]) or "None"
+    black_cap = " ".join(world["captured_pieces"]["black"]) or "None"
+    console.print(Panel(f"White has: {white_cap}\nBlack has: {black_cap}", title="Captured"))
+
+    moves = world["move_history"][-5:]
+    history = "\n".join(f"{i+1}. {m}" for i,m in enumerate(moves)) or "None"
+    console.print(Panel(history, title="Last Moves"))
+
+    cmds = """\
+move <from> <to>    – move a piece
+castle kingside     – castle kingside
+view chess          – redraw board
+"""
+    console.print(Panel(cmds, title="Commands", border_style="cyan"))

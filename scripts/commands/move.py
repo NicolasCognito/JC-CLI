@@ -95,6 +95,13 @@ else:
 if current_color == "black":
     world["fullmove_number"] += 1
 
+# Record the command in the world state
+world["last_command"] = {
+    "name": NAME,
+    "args": args,
+    "player": player
+}
+
 # Save the updated world state
 with open("data/world.json", "w") as f:
     json.dump(world, f, indent=2)
