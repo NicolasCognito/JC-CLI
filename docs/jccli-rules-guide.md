@@ -79,8 +79,6 @@ Direct file I/O bypasses the rule orchestration system and will lead to world st
 JC-CLI provides environment variables that rules can access:
 
 - `PLAYER` - The username of the player who issued the command
-- `COMMAND` - The command that triggered the rule
-- `COMMAND_ARGS` - Arguments passed to the command
 
 Example usage:
 
@@ -88,11 +86,6 @@ Example usage:
 import os
 
 player = os.environ.get("PLAYER", "unknown")
-command = os.environ.get("COMMAND", "")
-args = os.environ.get("COMMAND_ARGS", "")
-
-print(f"Rule triggered by {player} using command: {command} {args}", file=sys.stderr)
-```
 
 ## Rule Execution Flow
 
