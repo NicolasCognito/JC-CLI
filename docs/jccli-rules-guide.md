@@ -79,8 +79,6 @@ Direct file I/O bypasses the rule orchestration system and will lead to world st
 JC-CLI provides environment variables that rules can access:
 
 - `PLAYER` - The username of the player who issued the command
-- `COMMAND` - The command that triggered the rule
-- `COMMAND_ARGS` - Arguments passed to the command
 
 Example usage:
 
