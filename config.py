@@ -3,7 +3,7 @@
 
 # ------------- Utils ---------------------------
 
-USE_WIZTERM = True
+USE_WIZTERM = False
 
 # ------------- folders & files -----------------
 SESSIONS_DIR        = "sessions"
