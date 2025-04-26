@@ -59,7 +59,6 @@ def _execute_command(cmd: str, argv: list[str], username: str) -> bool:
     env = os.environ.copy()
     env["PLAYER"] = username
     env["COMMAND"] = cmd
-    env["COMMAND_ARGS"] = json.dumps(argv)
     
     #print(f"→ {cmd} ► {script} {argv}")
 

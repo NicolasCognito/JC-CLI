@@ -1,4 +1,27 @@
 {
-  "counter": 0,
-  "rules_in_power":["trim_counter"]
+  "board": [
+    ["BR", "BN", "BB", "BQ", "BK", "BB", "BN", "BR"],
+    ["BP", "BP", "BP", "BP", "BP", "BP", "BP", "BP"],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["WP", "WP", "WP", "WP", "WP", "WP", "WP", "WP"],
+    ["WR", "WN", "WB", "WQ", "WK", "WB", "WN", "WR"]
+  ],
+  "current_turn": "white",
+  "game_state": "in_progress",
+  "move_history": [],
+  "captured_pieces": {
+    "white": [],
+    "black": []
+  },
+  "castle_rights": {
+    "white": {"kingside": true, "queenside": true},
+    "black": {"kingside": true, "queenside": true}
+  },
+  "en_passant_target": null,
+  "halfmove_clock": 0,
+  "fullmove_number": 1,
+  "rules_in_power": ["turn_switch", "check_game_end", "pawn_promotion"]
 }
