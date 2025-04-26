@@ -2,6 +2,7 @@
 """Utility functions for file operations and process management"""
 
 import os
+import shlex
 import sys
 import platform
 import subprocess
@@ -50,65 +51,69 @@ def copy_directory(src, dst):
         print(f"Error copying directory: {e}")
         return False
 
-def launch_in_new_terminal(cmd, title=None):
-    """Launch a command in a new terminal window based on OS"""
+def launch_in_new_terminal(cmd, title: str | None = None) -> bool:
+    """
+    Launch `cmd` in a fresh terminal window.
+    - On Windows + WezTerm → wezterm start … powershell -NoExit …
+    - On plain Windows     → start powershell -NoExit …
+    - Anything else        → prints a hint and returns False.
+    `cmd` may be a str or a sequence of args.
+    """
     system = platform.system()
-    cwd = os.getcwd() # Get current working directory to ensure scripts run from the correct context
+    cwd = os.getcwd()
+
+    # Normalise `cmd` to a single string for the shell we’ll run inside
+    if isinstance(cmd, (list, tuple)):
+        # list2cmdline gives Windows-safe quoting
+        cmd_str = subprocess.list2cmdline(cmd)
+    else:
+        cmd_str = cmd
 
     try:
         if system == "Windows":
-            # Fixed Windows title handling
-            if title:
-                # Using the Start command directly which handles titles properly
-                subprocess.Popen(
-                    f'start "{title}" powershell -NoExit -Command "cd \'{cwd}\'; {cmd}"',
-                    shell=True
-                )
+            if shutil.which("wezterm") and config.USE_WIZTERM == True:
+                # ── WezTerm branch ───────────────────────────────────────────────
+                # Build the inner PowerShell command
+                inner_parts = [f"cd '{cwd}';"]
+                if title:
+                    # Change the console title inside the WezTerm tab
+                    inner_parts.append(f"$Host.UI.RawUI.WindowTitle='{title}';")
+                inner_parts.append(cmd_str)
+                inner_cmd = " ".join(inner_parts)
+
+                wez_args = [
+                    "wezterm", "start",
+                    "--cwd", cwd,          # sets starting directory for the tab
+                    "--",                  # everything after this is the program to run
+                    "powershell", "-NoExit", "-Command", inner_cmd
+                ]
+                subprocess.Popen(wez_args)
+
             else:
-                # No title specified
-                subprocess.Popen(
-                    f'start powershell -NoExit -Command "cd \'{cwd}\'; {cmd}"',
-                    shell=True
-                )
-
-        elif system == "Darwin":  # macOS
-            # Original AppleScript approach
-            apple_cmd = f'cd \\"{cwd}\\"; {cmd}' # Command needs escaping for AppleScript string
-            window_title_arg = f' with title "{title}"' if title else ""
-            osa_script = f'tell app "Terminal" to do script "{apple_cmd}"{window_title_arg}'
-            subprocess.Popen(["osascript", "-e", osa_script])
-
-        elif system == "Linux":
-            # Try common terminals, adapting original logic
-            try:
-                # gnome-terminal
-                term_cmd = ["gnome-terminal"]
-                if title: term_cmd.extend([f"--title={title}"])
-                term_cmd.extend(["--", "bash", "-c", f'cd "{cwd}" && {cmd}; exec bash'])
-                subprocess.Popen(term_cmd)
-            except FileNotFoundError:
-                try:
-                    # xterm fallback
-                    term_cmd = ["xterm"]
-                    if title: term_cmd.extend(["-T", title])
-                    term_cmd.extend(["-e", f'bash -c \'cd "{cwd}" && {cmd}; exec bash\'']) # Ensure inner command is quoted for -e
-                    subprocess.Popen(term_cmd)
-                except FileNotFoundError:
-                     print(f"Could not find gnome-terminal or xterm. Please run manually.")
-                     print(f"Command: cd \"{cwd}\" && {cmd}")
-                     return False
+                # ── Fallback branch (cmd’s `start`) ─────────────────────────────
+                # Windows built-ins like `start` require shell=True
+                if title:
+                    start_line = (
+                        f'start "{title}" powershell -NoExit '
+                        f'-Command "cd \'{cwd}\'; {cmd_str}"'
+                    )
+                else:
+                    start_line = (
+                        f'start powershell -NoExit '
+                        f'-Command "cd \'{cwd}\'; {cmd_str}"'
+                    )
+                subprocess.Popen(start_line, shell=True)
         else:
             print(f"Unsupported OS: {system}")
-            print(f"Please run this command manually in directory '{cwd}': {cmd}")
+            print(f"Run manually in {cwd!r}: {cmd_str}")
             return False
 
         return True
 
-    except Exception as e:
-        print(f"Error launching terminal: {e}")
-        print(f"Please run this command manually in directory '{cwd}': {cmd}")
+    except Exception as exc:
+        print(f"Error launching terminal: {exc}")
+        print(f"Run manually in {cwd!r}: {cmd_str}")
         return False
-
 # ──────────────────────────────────────────────────────────────────────────────
 
 def clear_client_state(commands_path: str, cursor_path: str, scripts_dir: str) -> None:

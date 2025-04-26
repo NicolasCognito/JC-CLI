@@ -1,6 +1,10 @@
 # engine/core/config.py
 """Configuration constants for the JC-CLI prototype."""
 
+# ------------- Utils ---------------------------
+
+USE_WIZTERM = True
+
 # ------------- folders & files -----------------
 SESSIONS_DIR        = "sessions"
 TEMPLATES_DIR       = "templates"
