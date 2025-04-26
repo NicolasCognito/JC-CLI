@@ -86,11 +86,6 @@ Example usage:
 import os
 
 player = os.environ.get("PLAYER", "unknown")
-command = os.environ.get("COMMAND", "")
-args = os.environ.get("COMMAND_ARGS", "")
-
-print(f"Rule triggered by {player} using command: {command} {args}", file=sys.stderr)
-```
 
 ## Rule Execution Flow
 
