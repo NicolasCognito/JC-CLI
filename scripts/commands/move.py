@@ -1,131 +1,103 @@
 #!/usr/bin/env python3
-# Command: move a chess piece
 NAME = "move"
 
 import json
 import sys
 import os
-import subprocess
 
 # Get player who issued the command
 player = os.environ.get("PLAYER", "unknown")
-command_args = os.environ.get("COMMAND_ARGS", "")
 
-# Parse move argument (e.g., "e2 e4" or "a1 h8")
-try:
-    from_pos, to_pos = command_args.strip().split()    # Convert chess notation to array indices
-    from_file, from_rank = from_pos[0], int(from_pos[1])
-    to_file, to_rank = to_pos[0], int(to_pos[1])
-    
-    from_col = ord(from_file) - ord('a')
-    from_row = 8 - from_rank
-    to_col = ord(to_file) - ord('a')
-    to_row = 8 - to_rank
-except ValueError:
-    print(f"Invalid move format. Use: move <from> <to> (e.g., 'move e2 e4')")
-    sys.exit(1)
+# Get command arguments (e.g., "e2e4")
+args = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else ""
 
 # Load the world state
 with open("data/world.json", "r") as f:
     world = json.load(f)
 
-# Check if game is still in progress
-if world["game_state"] not in ["in_progress", "check"]:
-    print(f"Game is over. Result: {world['game_state']}")
+# Verify it's the correct player's turn
+current_color = world["current_turn"]
+if (current_color == "white" and not player.startswith("player_white")) or \
+   (current_color == "black" and not player.startswith("player_black")):
+    print(f"Not your turn. It's {current_color}'s turn.")
     sys.exit(1)
 
-# Check if it's the player's turn
-player_color = "white" if player == "player1" else "black"
-if world["current_turn"] != player_color:
-    print(f"Not your turn. Current turn: {world['current_turn']}")
+# Parse chess coordinates (e.g., "e2e4")
+if len(args) != 4:
+    print("Invalid move format. Use format like 'e2e4'")
     sys.exit(1)
 
-# Check if the positions are valid
-if not (0 <= from_row < 8 and 0 <= from_col < 8 and 0 <= to_row < 8 and 0 <= to_col < 8):
-    print("Invalid position. Board is 8x8 (a1 to h8).")
+src_col, src_row = args[0], args[1]
+dst_col, dst_row = args[2], args[3]
+
+# Convert algebraic notation to array indices
+try:
+    # Convert columns (a=0, b=1, ..., h=7)
+    src_col_idx = ord(src_col.lower()) - ord('a')
+    dst_col_idx = ord(dst_col.lower()) - ord('a')
+    
+    # Convert rows (1=7, 2=6, ..., 8=0) - inverted because arrays are 0-indexed from top
+    src_row_idx = 8 - int(src_row)
+    dst_row_idx = 8 - int(dst_row)
+    
+    # Check if indices are valid
+    if not (0 <= src_col_idx <= 7 and 0 <= src_row_idx <= 7 and 
+            0 <= dst_col_idx <= 7 and 0 <= dst_row_idx <= 7):
+        raise ValueError("Coordinates out of bounds")
+except:
+    print("Invalid chess coordinates")
     sys.exit(1)
 
-# Check if there's a piece at the from_position
-piece = world["board"][from_row][from_col]
+# Get the piece at the source position
+piece = world["board"][src_row_idx][src_col_idx]
+
+# Check if there is a piece at the source position
 if not piece:
-    print(f"No piece at {from_pos}")
+    print("No piece at the source position")
     sys.exit(1)
 
-# Check if the piece belongs to the player
-piece_color = "white" if piece[0] == "W" else "black"
-if piece_color != player_color:
-    print(f"The piece at {from_pos} belongs to the opponent")
+# Check if the piece belongs to the current player
+piece_color = piece[0]  # First character of piece code (W/B)
+expected_color = "W" if current_color == "white" else "B"
+if piece_color != expected_color:
+    print(f"That piece doesn't belong to you")
     sys.exit(1)
 
-# Get piece type
-piece_type = piece[1]
-
-# Validate the move with the appropriate validator script
-validator_script = f"scripts/validators/{piece_type.lower()}_move.py"
-if os.path.exists(validator_script):
-    # Prepare input for validator
-    validation_input = {
-        "from_row": from_row,
-        "from_col": from_col,
-        "to_row": to_row,
-        "to_col": to_col,
-        "piece": piece,
-        "board": world["board"]
-    }
-    
-    # Call validator as subprocess
-    process = subprocess.run(
-        ["python3", validator_script],
-        input=json.dumps(validation_input),
-        text=True,
-        capture_output=True
-    )
-    
-    # Check validator result
-    if process.returncode != 0:
-        print(f"Invalid move: {process.stdout}")
-        sys.exit(1)
-else:
-    print(f"Error: No validator found for piece type {piece_type}")
+# Check if source and destination are different
+if src_row_idx == dst_row_idx and src_col_idx == dst_col_idx:
+    print("Source and destination are the same")
     sys.exit(1)
 
-# Capture logic
-target_piece = world["board"][to_row][to_col]
-if target_piece:
-    target_color = "white" if target_piece[0] == "W" else "black"
-    if target_color == player_color:
+# Record captured piece if any
+dst_piece = world["board"][dst_row_idx][dst_col_idx]
+if dst_piece:
+    captured_color = "black" if dst_piece[0] == "B" else "white"
+    if captured_color != current_color:  # Ensure we're not capturing our own piece
+        world["captured_pieces"][current_color].append(dst_piece)
+    else:
         print("Cannot capture your own piece")
         sys.exit(1)
-    # Add the captured piece to the list
-    world["captured_pieces"][player_color].append(target_piece)
 
-# Execute the move
-world["board"][to_row][to_col] = piece
-world["board"][from_row][from_col] = ""
+# Make the move
+world["board"][dst_row_idx][dst_col_idx] = piece
+world["board"][src_row_idx][src_col_idx] = ""
 
-# Record the move in algebraic notation
-from_notation = f"{chr(from_col + ord('a'))}{8 - from_row}"
-to_notation = f"{chr(to_col + ord('a'))}{8 - to_row}"
-move_record = f"{piece_type}{from_notation}-{to_notation}"
-if target_piece:
-    move_record += f"x{target_piece}"
-world["move_history"].append(move_record)
+# Update the move history using algebraic notation
+move_notation = f"{src_col}{src_row}-{dst_col}{dst_row}"
+world["move_history"].append(move_notation)
 
-# Update castling rights if king or rook moves
-if piece_type == "K":
-    world["castle_rights"][player_color]["kingside"] = False
-    world["castle_rights"][player_color]["queenside"] = False
-elif piece_type == "R":
-    # Kingside rook
-    if from_col == 7:
-        world["castle_rights"][player_color]["kingside"] = False
-    # Queenside rook
-    elif from_col == 0:
-        world["castle_rights"][player_color]["queenside"] = False
+# Increment the move counters
+if piece[1] == "P" or dst_piece:  # Pawn move or capture
+    world["halfmove_clock"] = 0
+else:
+    world["halfmove_clock"] += 1
+
+if current_color == "black":
+    world["fullmove_number"] += 1
 
 # Save the updated world state
 with open("data/world.json", "w") as f:
     json.dump(world, f, indent=2)
 
-print(f"Moved {piece} from {from_pos} to {to_pos}")
+print(f"Moved {piece} from {src_col}{src_row} to {dst_col}{dst_row}")
 sys.exit(0)

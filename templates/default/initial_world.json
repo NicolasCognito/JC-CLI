@@ -23,5 +23,5 @@
   "en_passant_target": null,
   "halfmove_clock": 0,
   "fullmove_number": 1,
-  "rules_in_power": ["turn_switch", "check_game_end", "pawn_promotion"]
+  "rules_in_power": ["turn_switch"]
 }
