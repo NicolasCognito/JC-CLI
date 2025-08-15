@@ -7,6 +7,7 @@ import threading
 import subprocess
 import platform
 import config
+from engine.core import world_state
 
 def get_local_ip_addresses():
     """Get all local IP addresses of this machine including virtual ones like ZeroTier
@@ -88,6 +89,13 @@ def initialize(session_dir=None):
         # Set session directory
         session_dir = session_dir or os.getcwd()
         history_path = os.path.join(session_dir, config.HISTORY_FILE)
+
+        # Load the initial world into memory so we can serve it without disk I/O
+        init_world = os.path.join(session_dir, config.INITIAL_WORLD_FILE)
+        try:
+            world_state.load_from_file(init_world)
+        except Exception as exc:
+            print(f"Warning: could not load initial world: {exc}")
         
         # Create server socket
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

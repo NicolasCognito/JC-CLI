@@ -4,7 +4,7 @@ import json, os, time, base64
 from typing import Dict, Any
 import threading          # helper for broadcast
 import config
-from engine.core import netcodec
+from engine.core import netcodec, world_state
 
 # -------------------------------------------------------------------- #
 # Command flow
@@ -46,15 +46,14 @@ def _reset_session(server: Dict):
             json.dump([], fh)
         server["sequence_number"] = 0
 
-        # 2) load initial world  ………………………………………………………………………………
+        # 2) load initial world into memory  ……………………………………………………………
         init_path = os.path.join(
             server["session_dir"], config.INITIAL_WORLD_FILE
         )
-        with open(init_path, "r", encoding="utf-8") as fh:
-            world = json.load(fh)
+        world_state.load_from_file(init_path)
 
         # 3) broadcast reset packet ………………………………………………………………………
-        pkt = {"type": "reset", "world": world}
+        pkt = {"type": "reset", "world": world_state.get_world()}
         _broadcast(server, pkt)
 
         print("=== SESSION RESET issued by host ===")
@@ -77,14 +76,11 @@ def send_snapshot(server: Dict, sock):
     except Exception as exc:
         print("Snapshot send failed:", exc)
 
-    # 2) send the initial world JSON
-    world_path = os.path.join(server["session_dir"], config.INITIAL_WORLD_FILE)
+    # 2) send the initial world JSON (from memory)
     try:
-        with open(world_path, "r", encoding="utf-8") as f:
-            world = json.load(f)
         init_pkt = {
             "type": "initial_world",
-            "world": world
+            "world": world_state.get_world()
         }
         sock.sendall(netcodec.encode(init_pkt))
     except Exception as exc:
