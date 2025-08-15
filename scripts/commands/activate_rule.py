@@ -11,39 +11,23 @@ Usage: activate <rule_id>
 import json
 import sys
 
-def load_world():
-    """Load the current world state"""
-    with open("data/world.json", "r") as f:
-        return json.load(f)
-
-def save_world(world):
-    """Save the updated world state"""
-    with open("data/world.json", "w") as f:
-        json.dump(world, f, indent=2)
 
 def main():
-    # Check arguments
     if len(sys.argv) < 2:
-        print("Usage: activate <rule_id>")
+        print("Usage: include <rule_id>", file=sys.stderr)
         sys.exit(1)
-    
+
     rule_id = sys.argv[1]
-    
-    # Load the current world state
-    world = load_world()
-    
-    # Check if the rule is already active
+
+    world = json.load(sys.stdin)
+
     if rule_id in world["rules_in_power"]:
-        print(f"Rule '{rule_id}' is already active")
-        sys.exit(0)
-    
-    # Add the rule to rules_in_power
-    world["rules_in_power"].append(rule_id)
-    
-    # Save the updated world state
-    save_world(world)
-    
-    print(f"Rule '{rule_id}' has been activated")
+        print(f"Rule '{rule_id}' is already active", file=sys.stderr)
+    else:
+        world["rules_in_power"].append(rule_id)
+        print(f"Rule '{rule_id}' has been activated", file=sys.stderr)
+
+    json.dump(world, sys.stdout)
     sys.exit(0)
 
 if __name__ == "__main__":

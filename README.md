@@ -53,9 +53,10 @@ JC-CLI draws an inviolable line between two realms:
 - **Infrastructure Realm** (Python engine) owns networking, command ordering, persistence, and rendering. It may only *append* to the command list and *read* the world.
 - **Logic Realm** (Lua scripts or disciplined Python) owns every state mutation. It may only *read* the command list and *write* the world. It is isolated from sockets, clocks and operating‑system APIs.
 
-Communication passes exclusively through two files:
-1. **World File** (`data/world.json`) - Contains the mutable world state
-2. **Commands File** (`data/commands.log`) - Contains the chronological list of player commands
+Mutable game state now lives in memory.  An optional snapshot file is
+maintained for debugging or external views:
+1. **World Snapshot** (`data/world.json`) - Optional dump of current world
+2. **Commands File** (`data/commands.log`) - Chronological list of player commands
 
 ## Implementation Structure
 
@@ -113,7 +114,7 @@ project_root/
 │   ├─ recipes/       # Reusable rule capsules
 │   └─ views/         # View templates for rendering the world
 ├─ data/              # Persistent surface between realms
-│   ├─ world.json     # Mutable world snapshot
+│   ├─ world.json     # Optional world snapshot
 │   └─ commands.log   # Ordered list of player commands
 ├─ templates/         # Seed worlds for quick restarts
 │   ├─ default/       # Default template
@@ -188,9 +189,9 @@ The detailed command flow in JC-CLI follows these steps:
    - After command completion, it triggers the rule loop
 
 6. **Command Execution**:
-   - Command script reads the world.json file
+   - Command script reads world JSON from stdin
    - Script modifies the world state according to command logic
-   - Script writes updated world.json file
+   - Script writes updated world JSON to stdout
 
 7. **Rule Loop**:
    - Rule loop identifies all applicable rules
@@ -198,7 +199,7 @@ The detailed command flow in JC-CLI follows these steps:
    - Each rule can further modify the world state
 
 8. **View Rendering**:
-   - View system reads the updated world.json file
+   - View system reads the snapshot file if needed
    - It renders the game state according to view-specific rules
    - Different views can present the same data differently (player vs. admin)
 
@@ -341,18 +342,9 @@ import json, sys
 
 # Command implementation
 def main():
-    # Read the current world state
-    with open("data/world.json", "r") as f:
-        world = json.load(f)
-    
-    # Modify the world state
+    world = json.load(sys.stdin)
     world["some_property"] = "new value"
-    
-    # Write the updated world state
-    with open("data/world.json", "w") as f:
-        json.dump(world, f, indent=2)
-    
-    # Return success
+    json.dump(world, sys.stdout)
     return 0
 
 if __name__ == "__main__":
@@ -361,7 +353,7 @@ if __name__ == "__main__":
 
 Important conventions:
 - The first non-comment line must define `NAME = "command_name"`
-- The script must read and write the world file directly
+- The script reads world JSON from stdin and writes updated JSON to stdout
 - The script should return 0 for success, non-zero for failure
 - No network or timing operations should be performed
 

@@ -20,6 +20,7 @@ from watchdog.events import FileSystemEventHandler
 
 # Engine configuration
 import config
+from engine.core import world_state
 
 # ---------------------------------------------------------------------------
 # Discovery helpers
@@ -95,6 +96,9 @@ class ViewManager:
 
     # ---------------- world helpers ----------------
     def _load_world(self):
+        world = world_state.get_world()
+        if world:
+            return world
         world_path = self.data_dir / config.WORLD_FILE
         try:
             with world_path.open() as fh:

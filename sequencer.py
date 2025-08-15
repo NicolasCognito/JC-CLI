@@ -4,7 +4,9 @@ Event-based Sequencer – append-only log + cursor
 Processes commands in strict sequence, exactly once.
 """
 
-import os, sys, json, time, argparse, shlex, subprocess, threading
+import os, sys, json, time, argparse, shlex, threading
+from engine.core import world_state
+import orchestrator
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import config
@@ -47,11 +49,14 @@ class Sequencer:
         self.data_dir   = os.path.join(self.client_dir, "data")
         self.log_file   = os.path.join(self.data_dir, config.COMMANDS_LOG_FILE)
         self.cursor_file= os.path.join(self.data_dir, config.CURSOR_FILE)
-        self.orchestrator = os.path.join(os.path.dirname(__file__), "orchestrator.py")
+        self.world_snapshot = os.path.join(self.data_dir, config.WORLD_FILE)
 
         for p in (self.data_dir,):
             os.makedirs(p, exist_ok=True)
         open(self.log_file, "a").close()   # ensure exists
+        initial_world = os.path.join(self.data_dir, config.INITIAL_WORLD_FILE)
+        if os.path.exists(initial_world):
+            world_state.load_from_file(initial_world)
 
         self.cursor = _read_cursor(self.cursor_file)
         self.lock   = threading.Lock()
@@ -123,23 +128,10 @@ class Sequencer:
 
         # Execute without check=True, since we want to continue even if command fails
         # Capture output to show it in raw form
-        result = subprocess.run(
-            [sys.executable, self.orchestrator, text, user],
-            cwd=self.client_dir,
-            capture_output=True,
-            text=True
-        )
-        
-        # Show raw output, not sanitized error messages
-        if result.stdout:
-            print(result.stdout)
-        if result.stderr:
-            print(result.stderr)
-            
-        if result.returncode != 0:
-            print(f"!!! COMMAND FAILED: '{cmd_name}' (code {result.returncode})")
-        
-        # Note: We don't return anything because sequencer will continue regardless
+        success = orchestrator.run(text, user)
+        world_state.dump_world(self.world_snapshot)
+        if not success:
+            print(f"!!! COMMAND FAILED: '{cmd_name}'")
 
 # ---------------------------------------------------------------------------#
 

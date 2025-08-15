@@ -4,7 +4,7 @@ import shutil
 import os, json, socket
 from typing import Any
 import config
-from engine.core import netcodec, utils
+from engine.core import netcodec, utils, world_state
 from engine.client import sequencer_control      # restart helper
 from engine.core.utils import clear_client_state
 
@@ -104,14 +104,9 @@ def listen_for_broadcasts(client: dict):
                         _handle_snapshot_zip(client, msg)
 
                     elif typ == "initial_world":
-                        # new: write the initial world into data/world.json
-                        dst = os.path.join(client["data_dir"], config.WORLD_FILE)
-                        try:
-                            with open(dst, "w", encoding="utf-8") as f:
-                                json.dump(msg["world"], f, indent=2)
-                            print("Initial world received.")
-                        except Exception as exc:
-                            print("Failed to write initial world:", exc)
+                        world_state.update_world(msg["world"])
+                        world_state.dump_world(os.path.join(client["data_dir"], config.WORLD_FILE))
+                        print("Initial world received.")
                     # ───────── RESET – blank client and re-seed world ───────
                     elif typ == "reset":
                         _handle_reset(client, msg)          # NEW
@@ -151,9 +146,8 @@ def _handle_reset(client: dict, msg: dict):
     sequencer_control.start_sequencer(client)
 
     # 3) write new world
-    dst = os.path.join(client["data_dir"], config.WORLD_FILE)
-    with open(dst, "w", encoding="utf-8") as fh:
-        json.dump(msg["world"], fh, indent=2)
+    world_state.update_world(msg["world"])
+    world_state.dump_world(os.path.join(client["data_dir"], config.WORLD_FILE))
 
     # 4) reset history-pull helpers
     client["_history_high"]  = None

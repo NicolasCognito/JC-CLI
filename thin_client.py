@@ -123,7 +123,7 @@ def cli_loop(client):
     that view scripts use.  This way the sequencer processes them exactly
     the same way.
     """
-    print("CLI> Type commands here (or use your IDE to edit world.json directly).")
+    print("CLI> Type commands here.")
     try:
         while True:
             cmd = input("CLI> ").strip()

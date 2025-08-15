@@ -8,21 +8,19 @@ Adds a value to the counter in world state
 import json
 import sys
 
-# No validation - pure JC-CLI approach
-# Just try to convert the argument to an int and let it fail if invalid
-value = int(sys.argv[1])
 
-# Read world state
-with open("data/world.json", "r") as f:
-    world = json.load(f)
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: raise <value>", file=sys.stderr)
+        sys.exit(1)
 
-# Update counter
-world["counter"] += value
-print(f"Counter raised to {world['counter']}")
+    value = int(sys.argv[1])
+    world = json.load(sys.stdin)
+    world["counter"] += value
+    print(f"Counter raised to {world['counter']}", file=sys.stderr)
+    json.dump(world, sys.stdout)
+    sys.exit(0)
 
-# Write world state
-with open("data/world.json", "w") as f:
-    json.dump(world, f, indent=2)
 
-# Exit with success - let the rule loop handle any automatic effects
-sys.exit(0)
+if __name__ == "__main__":
+    main()

@@ -20,7 +20,6 @@ import json, sys, subprocess, pathlib, re
 
 CWD           = pathlib.Path.cwd()
 RULES_DIR     = CWD / "scripts" / "rules"
-WORLD_FILE    = CWD / "data" / "world.json"
 NAME_PATTERN  = re.compile(r'NAME\s*=\s*["\'](.+?)["\']')
 
 def _discover_rules(folder: pathlib.Path = RULES_DIR) -> dict[str, str]:
@@ -42,24 +41,8 @@ def _discover_rules(folder: pathlib.Path = RULES_DIR) -> dict[str, str]:
 
 RULES = _discover_rules()
 
-def _load_world() -> dict:
-    try:
-        return json.loads(WORLD_FILE.read_text())
-    except Exception as e:
-        # Show raw error but use empty world to allow continuation
-        print(f"!!! ERROR: Failed to load world data: {e}")
-        return {}
-
-def _save_world(world: dict):
-    try:
-        WORLD_FILE.parent.mkdir(parents=True, exist_ok=True)
-        WORLD_FILE.write_text(json.dumps(world, indent=2))
-    except Exception as e:
-        print(f"!!! ERROR: Failed to save world data: {e}")
-        # Don't handle the error - let caller see the raw failure
-
 def _run_rule(rid: str, path: str, world: dict) -> tuple[dict, bool]:
-    print(f"Running rule: {rid} => {path}")
+    print(f"Running rule: {rid} => {path}", file=sys.stderr)
     try:
         # Pass the world data as input to the rule script
         # Show raw output for maximum transparency
@@ -97,7 +80,12 @@ def main():
         print("!!! WARNING: No rules found.")
         sys.exit(9)  # No changes
 
-    world = _load_world()
+    try:
+        raw = sys.stdin.buffer.read()
+        world = json.loads(raw or b"{}")
+    except Exception as e:
+        print(f"!!! ERROR: Failed to read world from stdin: {e}")
+        world = {}
     active = world.get("rules_in_power")
     
     # If no rules_in_power specified, run all discovered rules
@@ -115,7 +103,7 @@ def main():
         world, did = _run_rule(rid, path, world)
         changed |= did
 
-    _save_world(world)
+    print(json.dumps(world))
     sys.exit(0 if changed else 9)
 
 if __name__ == "__main__":

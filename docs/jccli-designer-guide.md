@@ -27,7 +27,7 @@ All player actions are structured as text commands that:
 ### Transparent Data Model
 
 Your entire game state lives in two files:
-- `world.json` - The current game state
+- `world.json` - Snapshot of the current game state
 - `commands.log` - The chronological list of player commands
 
 This transparency makes debugging easy—you can directly inspect both files at any time.
@@ -76,8 +76,7 @@ NAME = "draw"
 import json, sys, random
 
 # Load the world state
-with open("data/world.json", "r") as f:
-    world = json.load(f)
+world = json.load(sys.stdin)
 
 # Get player who issued the command
 player = sys.argv[1] if len(sys.argv) > 1 else "unknown"
@@ -95,8 +94,7 @@ else:
     print("Deck is empty")
 
 # Save the new world state
-with open("data/world.json", "w") as f:
-    json.dump(world, f, indent=2)
+json.dump(world, sys.stdout)
 
 # Exit with success code
 sys.exit(0)
