@@ -95,7 +95,7 @@ def delete_all_sessions_and_clients(force=False):
             print("All sessions deleted.")
             
         # Delete clients directory
-        clients_dir = "clients"  # This appears to be hardcoded in the codebase
+        clients_dir = config.CLIENTS_ROOT
         if os.path.exists(clients_dir):
             shutil.rmtree(clients_dir)
             print("All clients deleted.")

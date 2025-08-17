@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+import sys, pathlib
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 """
 Event-based Sequencer – append-only log + cursor
 Processes commands in strict sequence, exactly once.

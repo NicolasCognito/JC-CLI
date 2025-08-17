@@ -6,18 +6,19 @@
   - scripts/commands/: One file per player command.
   - scripts/rules/: Automatic effects run after commands.
   - scripts/views/: Session UI renderers.
+- app/: Entry scripts
+  - app/thin_server.py, app/thin_client.py
+  - app/orchestrator.py, app/rule_loop.py, app/sequencer.py, app/view.py
 - `jc-cli.py`: Interactive shell for sessions.
-- `thin_server.py` / `thin_client.py`: Network coordinator and client.
-- `orchestrator.py` / `rule_loop.py` / `sequencer.py` / `view.py`: Command discovery, rules loop, ordering, view launcher.
 - templates/: Seed worlds (e.g., `templates/default/initial_world.json`).
-- sessions/, clients/: Runtime/session data.
+- var/sessions, var/clients: Runtime data and local client workspaces.
 - docs/: Deep-dive guides for designers and rule authors.
 
 ## Build, Test, and Development Commands
 - Install deps: `pip install watchdog` (Python ≥3.6).
 - Start shell: `python jc-cli.py` (then run interactive commands).
 - Quick flow: `start-session my_s default` → `join-session my_s me`.
-- Run server/client directly (advanced): `python thin_server.py`, `python thin_client.py --session <name> --user <me>`.
+- Run server/client directly (advanced): `python app/thin_server.py`, `python app/thin_client.py --session <name> --user <me>`.
 
 ## Coding Style & Naming Conventions
 - Python style: 4‑space indent, PEP 8, `snake_case` for functions/variables, `CAPS` for constants.
@@ -27,7 +28,7 @@
 
 ## Testing Guidelines
 - No formal test suite. Prefer fast smoke tests:
-  - Create session, issue commands, verify world diffs in `sessions/<session>/data/world.json`.
+  - Create session, issue commands, verify world diffs in `var/sessions/<session>/data/world.json`.
   - Use `scripts/commands/list_rules.py` and related examples to validate discovery.
 - Keep rules atomic; verify exit codes (0/9) and repeated stability on replays.
 - See `docs/jccli-rules-guide.md` for correct rule I/O patterns.

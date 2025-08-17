@@ -1,7 +1,7 @@
 [
-    "orchestrator.py",
-    "rule_loop.py",
-    "view.py",
+    "app/orchestrator.py",
+    "app/rule_loop.py",
+    "app/view.py",
     "config.py",
     "scripts"
 ]

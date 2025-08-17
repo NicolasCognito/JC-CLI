@@ -6,10 +6,11 @@
 USE_WIZTERM = False
 
 # ------------- folders & files -----------------
-SESSIONS_DIR        = "sessions"
+SESSIONS_DIR        = "var/sessions"
 TEMPLATES_DIR       = "templates"
 DEFAULT_TEMPLATE     = "default"
-CLIENT_DIR          = "clients"
+CLIENT_DIR          = "clients"  # per-session clients subdir
+CLIENTS_ROOT        = "var/clients"  # local client workspaces root
 DATA_DIR            = "data"
 SNAPSHOT_DIR        = "engine_snapshot"      # inside session
 
@@ -35,11 +36,11 @@ HISTORY_PAGE_SIZE   = 200
 
 
 # ------------- entry scripts -------------------
-ORCHESTRATOR_SCRIPT = "orchestrator.py"
-RULE_LOOP_SCRIPT    = "rule_loop.py"
-SERVER_SCRIPT       = "thin_server.py"
-CLIENT_SCRIPT       = "thin_client.py"
-SEQUENCER_SCRIPT    = "sequencer.py"
+ORCHESTRATOR_SCRIPT = "app/orchestrator.py"
+RULE_LOOP_SCRIPT    = "app/rule_loop.py"
+SERVER_SCRIPT       = "app/thin_server.py"
+CLIENT_SCRIPT       = "app/thin_client.py"
+SEQUENCER_SCRIPT    = "app/sequencer.py"
 SCRIPTS_DIR         = "scripts"
 DEFAULT_VIEW        = "default"
 

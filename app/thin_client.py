@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+import sys, pathlib
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 """
 JC-CLI Thin Client - Network-Enabled Version with Built-in CLI
 A minimal client that sends commands to the server, appends received ordered

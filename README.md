@@ -63,13 +63,13 @@ The implementation consists of several key components that work together to deli
 
 ### Entry Points
 
-- **jc-cli.py** - Interactive CLI shell that provides session, project, and version management
-- **thin_server.py** - Networked server that coordinates command distribution
-- **thin_client.py** - Client that connects to the server and processes commands locally
-- **orchestrator.py** - Core component that discovers and executes commands and rule scripts
-- **rule_loop.py** - Executes automatic effects after each command
-- **sequencer.py** - Ensures commands are processed in the same order on all clients
-- **view.py** - Launches appropriate game-specific view scripts
+- **jc-cli.py** - Interactive CLI shell for sessions and clients
+- **app/thin_server.py** - Networked server that coordinates command distribution
+- **app/thin_client.py** - Client that connects to the server and processes commands locally
+- **app/orchestrator.py** - Core component that discovers and executes commands and rule scripts
+- **app/rule_loop.py** - Executes automatic effects after each command
+- **app/sequencer.py** - Ensures commands are processed in the same order on all clients
+- **app/view.py** - Launches appropriate game-specific view scripts
 
 ### Engine Components
 
@@ -100,12 +100,12 @@ engine/
 ```
 project_root/
 ├─ jc-cli.py          # Interactive session manager
-├─ orchestrator.py    # Command discovery and execution
-├─ rule_loop.py       # Automatic effects execution
-├─ sequencer.py       # Ordered command processing
-├─ thin_client.py     # Networked client
-├─ thin_server.py     # Networked server
-├─ view.py            # View system launcher
+├─ app/orchestrator.py    # Command discovery and execution
+├─ app/rule_loop.py       # Automatic effects execution
+├─ app/sequencer.py       # Ordered command processing
+├─ app/thin_client.py     # Networked client
+├─ app/thin_server.py     # Networked server
+├─ app/view.py            # View system launcher
 ├─ engine/            # Infrastructure realm (described above)
 ├─ scripts/           # Logic realm (physically separate from engine)
 │   ├─ commands/      # One file per player command keyword
@@ -121,13 +121,13 @@ project_root/
 │   │   ├─ engine_snapshot.json  # Engine files manifest
 │   │   └─ client_snapshot.json  # Client files manifest
 │   └─ ... (other templates)
-├─ sessions/          # Active game sessions
+├─ var/sessions/          # Active game sessions
 │   └─ <session_name>/  # Each session gets its own directory
 │       ├─ data/        # Session-specific data
 │       ├─ engine_snapshot/  # Fixed engine code snapshot
 │       ├─ history.json  # Command history
 │       └─ initial_world.json  # Starting world state
-├─ clients/           # Client-specific data
+├─ var/clients/           # Client-specific data
 │   └─ <session_name>/
 │       └─ <client_name>/  # Each client gets its own directory
 │           ├─ data/      # Client-local data
@@ -585,7 +585,7 @@ Unknown command: my_command
 
 4. **Run the orchestrator directly**:
    ```
-   python orchestrator.py "command_name arg1 arg2"
+   python app/orchestrator.py "command_name arg1 arg2"
    ```
 
 ## Advanced Topics
@@ -672,7 +672,7 @@ To create a custom rule system:
    }
    ```
 
-3. The rule_loop.py script will automatically discover and apply these rules
+3. The app/rule_loop.py script will automatically discover and apply these rules
 
 ### Alternative View Systems
 
