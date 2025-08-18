@@ -1,13 +1,12 @@
 @echo off
 setlocal enableextensions
 
-REM Change to the directory of this script (repo root)
-pushd "%~dp0" >NUL
+REM Change to repo root (this script lives in utils\)
+pushd "%~dp0.." >NUL
 
 REM Safety check: ensure we're in the project root by checking for jc-cli.py
 if not exist "jc-cli.py" (
-  echo This script must be run from the project root.
-  echo Expected to find jc-cli.py next to this script.
+  echo This script must be run within the project. jc-cli.py not found.
   popd
   exit /b 1
 )

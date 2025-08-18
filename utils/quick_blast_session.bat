@@ -1,8 +1,11 @@
 @echo off
 setlocal ENABLEDELAYEDEXPANSION
 
-REM Quick blast session: alice joins, sends 100x "raise 4", then bob joins
-REM Usage: double-click or run from repo root
+REM Quick blast session: alice joins, sends 10x "raise 4", then bob joins
+REM Can be run from anywhere; it cds to repo root.
+
+REM Change to repo root (this script lives in utils\)
+pushd "%~dp0.." >NUL
 
 REM Generate a random session name if not provided
 if "%~1"=="" (
@@ -16,6 +19,7 @@ REM Start the session (spawns server in a new terminal)
 python -u jc-cli.py start-session %SESSION% default
 if errorlevel 1 (
   echo Failed to start session %SESSION%.
+  popd >NUL
   exit /b 1
 )
 
@@ -53,10 +57,13 @@ python -u jc-cli.py join-session %SESSION% bob
 echo.
 echo Launched server and clients for session: %SESSION%
 echo Alice queued 10x "raise 4". Bob connected after.
+
+popd >NUL
 exit /b 0
 
 :no_queue
 echo Timed out waiting for alice's command queue: %QUEUE%
 echo You can run the commands manually once the file appears.
+popd >NUL
 exit /b 1
 
