@@ -34,7 +34,7 @@ CURSOR_FILE         = "cursor.seq"
 #              command scripts by writing the current world to disk
 #              before each command and reading it back afterward.
 # Switch with env var JC_WORLD_MODE without changing repo config.
-WORLD_MODE          = "memory"
+WORLD_MODE          = "file"
 
 # ------------- network -------------------------
 SERVER_HOST         = "0.0.0.0"

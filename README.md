@@ -716,3 +716,50 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Contributors and maintainers
 - Inspiration from deterministic game engines
 - Early testers and feedback providers
+
+---
+
+# August 18 Updates: Memory Mode, Workers, and View Sync
+
+This repository now supports a high‑performance memory mode alongside the original file mode. Memory mode avoids disk I/O during command and rule execution and keeps the world in RAM inside the sequencer. It also adds persistent workers for commands and rules.
+
+## Execution Modes
+- File mode (default):
+  - Commands and rules run as separate Python processes.
+  - `data/world.json` is the source of truth and is updated after each command.
+  - Views read `world.json` directly or redraw on `cursor.seq`.
+- Memory mode (opt‑in):
+  - Set `JC_WORLD_MODE=memory` (or `config.WORLD_MODE = "memory"`).
+  - World state lives inside the sequencer; no file reads/writes during command/rule execution.
+  - Persistent workers: `engine/command_worker.py` (commands) and `engine/rule_worker.py` (rules).
+  - View fetches world from the sequencer via a local socket (no `world.json` reads).
+
+## Key Components
+- `engine/sequencer.py` (memory mode):
+  - Caches `scripts/commands/*.py` and `scripts/rules/*.py` sources at startup.
+  - Reuses a single command worker (in‑process execution of commands).
+  - Reuses a single rule worker (in‑process execution of rules).
+  - Serves world JSON to the view on `JC_MEM_VIEW_HOST`/`JC_MEM_VIEW_PORT`.
+- `engine/memshim/sitecustomize.py`:
+  - Intercepts `open('data/world.json')` for child processes when `JC_WORLD_MODE=memory`.
+  - Emits `WORLD_OUTPUT: { ... }` as single‑line JSON for easy parsing.
+- `engine/view.py`:
+  - Adds `--mem-host/--mem-port` to fetch world via socket (memory mode); otherwise reads `world.json` (file mode).
+
+## Environment Variables
+- `JC_WORLD_MODE`: `file` (default) or `memory`.
+- `JC_MEM_VIEW_HOST`, `JC_MEM_VIEW_PORT`: where the view fetches world in memory mode.
+- Internals used by the engine:
+  - `JC_CMD_SRC` (command source), `JC_RULE_PACK` (rule sources), `JC_MEM_WORLD_IN` (world JSON for children).
+
+## Quick Blast Script
+- New `quick_blast_session.bat`:
+  - Starts a session, joins Alice, waits for her `command_queue.txt`, appends 100× `raise 4`, then joins Bob.
+  - Usage: `quick_blast_session.bat [session-name]`.
+
+## Performance Notes
+- Memory mode removes process and disk overhead for command/rule execution and should feel “instant”.
+- File mode remains ideal for manual JSON editing and transparent debugging.
+  - For stress tests on Windows, consider pacing bursts or running from ext4 (WSL home) to reduce NTFS overhead.
+
+See `August18_MINDMAP.md` for a deeper architecture walk‑through of these additions.

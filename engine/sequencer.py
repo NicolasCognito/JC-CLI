@@ -9,7 +9,7 @@ Event-based Sequencer – append-only log + cursor
 Processes commands in strict sequence, exactly once.
 """
 
-import os, sys, json, time, argparse, shlex, subprocess, threading, socket
+import os, sys, json, time, argparse, shlex, subprocess, threading, socket, re, pathlib
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import config
@@ -72,6 +72,10 @@ class Sequencer:
                 self._mem_port = 0
             if self._mem_port:
                 threading.Thread(target=self._world_server, daemon=True).start()
+            # Preload command and rule sources into memory
+            self._cmd_sources = self._discover_command_sources()
+            self._rule_sources = self._discover_rule_sources()
+            self._cmd_worker = None
         self.lock   = threading.Lock()
 
         self.observer = Observer()
@@ -141,37 +145,99 @@ class Sequencer:
 
         # Execute without check=True, since we want to continue even if command fails
         # Capture output to show it in raw form
-        env = os.environ.copy()
         if self.world_mode == "memory":
-            env["JC_WORLD_MODE"] = "memory"
-            env["JC_MEM_WORLD_IN"] = json.dumps(self.memory_world or {})
-        result = subprocess.run(
-            [sys.executable, self.orchestrator, text, user],
-            cwd=self.client_dir,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
+            # Ensure worker
+            if self._cmd_worker is None or self._cmd_worker.poll() is not None:
+                self._cmd_worker = subprocess.Popen(
+                    [sys.executable, os.path.join(os.path.dirname(__file__), "command_worker.py")],
+                    cwd=self.client_dir,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    text=True,
+                )
+            # Send job
+            job = {
+                "type": "run",
+                "cmd": cmd_name,
+                "argv": cmd_args,
+                "world": self.memory_world or {},
+                "source": self._cmd_sources.get(cmd_name, ""),
+                "username": user,
+            }
+            try:
+                assert self._cmd_worker.stdin is not None
+                self._cmd_worker.stdin.write(json.dumps(job) + "\n")
+                self._cmd_worker.stdin.flush()
+                assert self._cmd_worker.stdout is not None
+                resp_line = self._cmd_worker.stdout.readline()
+                resp = json.loads(resp_line or "{}")
+            except Exception as e:
+                print(f"[Worker] communication error: {e}")
+                resp = {"ok": False, "stdout": "", "stderr": str(e), "exit": 1, "world": self.memory_world or {}}
+
+            # Show command outputs
+            if resp.get("stdout"):
+                print(resp.get("stdout"))
+            if resp.get("stderr"):
+                print(resp.get("stderr"))
+
+            # Run rules via persistent worker
+            if not hasattr(self, "_rule_worker") or self._rule_worker is None or self._rule_worker.poll() is not None:
+                self._rule_worker = subprocess.Popen(
+                    [sys.executable, os.path.join(os.path.dirname(__file__), "rule_worker.py")],
+                    cwd=self.client_dir,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    text=True,
+                )
+            rule_job = {
+                "type": "run",
+                "world": resp.get("world") or {},
+                "sources": self._rule_sources,
+                # Let worker decide active if not specified
+                "active": (resp.get("world") or {}).get("rules_in_power"),
+            }
+            try:
+                assert self._rule_worker.stdin is not None
+                self._rule_worker.stdin.write(json.dumps(rule_job) + "\n")
+                self._rule_worker.stdin.flush()
+                assert self._rule_worker.stdout is not None
+                rule_resp_line = self._rule_worker.stdout.readline()
+                rule_resp = json.loads(rule_resp_line or "{}")
+            except Exception as e:
+                print(f"[RuleWorker] communication error: {e}")
+                rule_resp = {"ok": False, "exit": 1, "world": resp.get("world") or {}, "stdout": "", "stderr": str(e)}
+
+            if rule_resp.get("stdout"):
+                print(rule_resp.get("stdout"))
+            if rule_resp.get("stderr"):
+                print(rule_resp.get("stderr"))
+            self.memory_world = rule_resp.get("world") or (resp.get("world") or {})
+            # fake a result object for uniform logging below
+            class _R: pass
+            result = _R()
+            result.returncode = 0 if resp.get("ok") and rule_resp.get("exit") in (0, 9) else 1
+            result.stdout = ""
+            result.stderr = ""
+        else:
+            env = os.environ.copy()
+            result = subprocess.run(
+                [sys.executable, self.orchestrator, text, user],
+                cwd=self.client_dir,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
         
         # Show raw output, not sanitized error messages
-        if result.stdout:
+        if hasattr(result, "stdout") and result.stdout:
             print(result.stdout)
-        if result.stderr:
+        if hasattr(result, "stderr") and result.stderr:
             print(result.stderr)
             
         if result.returncode != 0:
             print(f"!!! COMMAND FAILED: '{cmd_name}' (code {result.returncode})")
-        else:
-            if self.world_mode == "memory":
-                # Update in-memory world from orchestrator's final marker
-                for line in (result.stdout or "").splitlines()[::-1]:
-                    if line.startswith("WORLD_FINAL:"):
-                        payload = line.split(":", 1)[1].strip()
-                        try:
-                            self.memory_world = json.loads(payload)
-                        except Exception:
-                            pass
-                        break
+        # In memory mode, world has been updated above from worker responses
         
         # Note: We don't return anything because sequencer will continue regardless
 
@@ -194,6 +260,59 @@ class Sequencer:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(world, fh, indent=2)
+
+    # --------- script discovery/helpers (memory mode) ---------
+    def _discover_command_sources(self) -> dict:
+        base = pathlib.Path(self.client_dir) / "scripts" / "commands"
+        name_pat = re.compile(r'^\s*NAME\s*=\s*["\'](.+?)["\']')
+        reg: dict[str, str] = {}
+        try:
+            for path in base.rglob("*.py"):
+                try:
+                    text = path.read_text(encoding="utf-8")
+                    first_non_comment = None
+                    for line in text.splitlines():
+                        s = line.strip()
+                        if not s or s.startswith('#'):
+                            continue
+                        first_non_comment = s
+                        break
+                    if not first_non_comment:
+                        continue
+                    m = name_pat.match(first_non_comment)
+                    if m:
+                        reg[m.group(1)] = text
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return reg
+
+    def _discover_rule_sources(self) -> dict:
+        base = pathlib.Path(self.client_dir) / "scripts" / "rules"
+        name_pat = re.compile(r'^\s*NAME\s*=\s*["\'](.+?)["\']')
+        reg: dict[str, str] = {}
+        try:
+            for path in base.rglob("*.py"):
+                try:
+                    text = path.read_text(encoding="utf-8")
+                    first_non_comment = None
+                    for line in text.splitlines():
+                        s = line.strip()
+                        if not s or s.startswith('#'):
+                            continue
+                        first_non_comment = s
+                        break
+                    if not first_non_comment:
+                        continue
+                    m = name_pat.match(first_non_comment)
+                    if m:
+                        reg[m.group(1)] = text
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return reg
 
     def _world_server(self):
         try:

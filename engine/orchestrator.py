@@ -39,15 +39,13 @@ def _discover_commands(folder: pathlib.Path = COMMANDS_DIR) -> dict[str, str]:
             pass
     return registry
 
-COMMANDS = _discover_commands()
-
 def _ensure_world():
     WORLD_FILE.parent.mkdir(parents=True, exist_ok=True)
     if not WORLD_FILE.exists():
         WORLD_FILE.write_text(json.dumps({"counter": 0}, indent=2))
 
-def _execute_command(cmd: str, argv: list[str], username: str) -> bool:
-    script = COMMANDS.get(cmd)
+def _execute_command(commands: dict[str, str], cmd: str, argv: list[str], username: str) -> bool:
+    script = commands.get(cmd)
     if not script:
         print(f"ERROR! Unknown command: {cmd}")
         return False
@@ -82,8 +80,10 @@ def main():
         sys.exit(1)
 
     mode = os.environ.get("JC_WORLD_MODE", "file")
+    commands_reg: dict[str, str] = {}
     if mode != "memory":
         _ensure_world()
+        commands_reg = _discover_commands()
     raw = sys.argv[1]
     
     # Extract username from arguments or use default
@@ -107,14 +107,22 @@ def main():
         # Prepend memshim to PYTHONPATH so sitecustomize is importable
         shim_dir = str((pathlib.Path(__file__).parent / "memshim").resolve())
         env["PYTHONPATH"] = shim_dir + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        # Resolve command path and run
-        cmd_path = COMMANDS.get(cmd)
-        if not cmd_path:
-            print(f"ERROR! Unknown command: {cmd}")
-            command_success = False
-            world_after_cmd = env.get("JC_MEM_WORLD_IN", "{}")
+        cmd_source = env.get("JC_CMD_SRC")
+        if not cmd_source:
+            # Fallback: try file if available
+            commands_reg = _discover_commands()
+            cmd_path = commands_reg.get(cmd)
+            if not cmd_path:
+                print(f"ERROR! Unknown command: {cmd}")
+                command_success = False
+                world_after_cmd = env.get("JC_MEM_WORLD_IN", "{}")
+            else:
+                print(f"-> {cmd} > {cmd_path} {argv}")
+                cmd_result = subprocess.run([sys.executable, cmd_path, *argv],
+                                            env=env, capture_output=True, text=True)
         else:
-            cmd_result = subprocess.run([sys.executable, cmd_path, *argv],
+            print(f"-> {cmd} > [in-memory] {argv}")
+            cmd_result = subprocess.run([sys.executable, "-c", cmd_source, *argv],
                                         env=env, capture_output=True, text=True)
             # Show command output
             if cmd_result.stdout:
@@ -135,7 +143,7 @@ def main():
         rule_result = subprocess.run([sys.executable, RULE_LOOP_PY],
                                      env=env, capture_output=True, text=True)
     else:
-        command_success = _execute_command(cmd, argv, username)
+        command_success = _execute_command(commands_reg, cmd, argv, username)
         # Always run the rule loop, even if the command failed
         rule_result = subprocess.run([sys.executable, RULE_LOOP_PY],
                                      capture_output=True, text=True)
