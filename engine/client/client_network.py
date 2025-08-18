@@ -112,6 +112,15 @@ def listen_for_broadcasts(client: dict):
                             print("Initial world received.")
                         except Exception as exc:
                             print("Failed to write initial world:", exc)
+                        # If running in memory mode, (re)start sequencer so its in-memory world seeds from the new file
+                        try:
+                            wm = os.environ.get("JC_WORLD_MODE", getattr(config, "WORLD_MODE", "file"))
+                            if wm == "memory":
+                                sequencer_control.cleanup(client)
+                                sequencer_control.start_sequencer(client)
+                                print("Sequencer restarted after initial world.")
+                        except Exception as exc:
+                            print("Could not restart sequencer after initial world:", exc)
                     # ───────── RESET – blank client and re-seed world ───────
                     elif typ == "reset":
                         _handle_reset(client, msg)          # NEW

@@ -3,7 +3,7 @@
 
 # ------------- Utils ---------------------------
 
-USE_WIZTERM = False
+USE_WIZTERM = True
 
 # ------------- folders & files -----------------
 SESSIONS_DIR        = "var/sessions"
@@ -34,7 +34,7 @@ CURSOR_FILE         = "cursor.seq"
 #              command scripts by writing the current world to disk
 #              before each command and reading it back afterward.
 # Switch with env var JC_WORLD_MODE without changing repo config.
-WORLD_MODE          = "file"
+WORLD_MODE          = "memory"
 
 # ------------- network -------------------------
 SERVER_HOST         = "0.0.0.0"

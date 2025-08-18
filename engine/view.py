@@ -107,12 +107,27 @@ class ViewManager:
         if self.mem_host and self.mem_port:
             import socket
             try:
-                with socket.create_connection((self.mem_host, int(self.mem_port)), timeout=0.2) as s:
+                with socket.create_connection((self.mem_host, int(self.mem_port)), timeout=0.5) as s:
                     try:
                         s.sendall(b"GET\n")
+                        try:
+                            s.shutdown(socket.SHUT_WR)
+                        except Exception:
+                            pass
                     except Exception:
                         pass
-                    data = s.recv(1 << 20)
+                    # Read until the server closes or we time out
+                    chunks: list[bytes] = []
+                    s.settimeout(0.5)
+                    while True:
+                        try:
+                            chunk = s.recv(65536)
+                            if not chunk:
+                                break
+                            chunks.append(chunk)
+                        except socket.timeout:
+                            break
+                    data = b"".join(chunks)
                 return json.loads(data.decode("utf-8")) if data else {}
             except Exception:
                 return {}
@@ -127,7 +142,11 @@ class ViewManager:
     # ---------------- rendering --------------------
     def render_once(self):
         world = self._load_world()
-        ctx   = {"username": self.username}
+        ctx   = {
+            "username": self.username,
+            "client_dir": str(self.client_dir),
+            "data_dir": str(self.data_dir),
+        }
         # clear terminal for readability
         os.system('cls' if os.name == 'nt' else 'clear')
         try:

@@ -5,21 +5,34 @@ Renders a Pillow chessboard as a PNG using piece images from the images director
 displays it inline via imgcat, prints CLI panels with Rich, and saves the image for debugging.
 """
 
-NAME = "chess_rich"
+NAME = "default"
 
 import os
 import io
 import sys
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont  # pip install pillow
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich import box
+
+# Optional dependencies: Pillow (images), imgcat (inline), Rich (pretty text)
+try:
+    from PIL import Image, ImageDraw, ImageFont  # pip install pillow
+    HAS_PIL = True
+except Exception:
+    Image = ImageDraw = ImageFont = None  # type: ignore
+    HAS_PIL = False
+
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich import box
+    HAS_RICH = True
+except Exception:
+    Console = None  # type: ignore
+    HAS_RICH = False
 try:
     from imgcat import imgcat                  # pip install imgcat
     HAS_IMGCAT = True
-except ImportError:
+except Exception:
     HAS_IMGCAT = False
 
 # Board rendering settings
@@ -114,7 +127,7 @@ def make_board_image(world):
         font = ImageFont.load_default()
     
     # Load piece images
-    piece_images = load_piece_images()
+    piece_images = load_piece_images() if HAS_PIL else {}
     
     # Draw the board squares - keep the same orientation with black at top, white at bottom
     for r in range(8):
@@ -126,7 +139,7 @@ def make_board_image(world):
             
             # Draw piece - access board in correct orientation
             piece = board[r][c] if r < len(board) and c < len(board[r]) else ""
-            if piece and piece in piece_images:
+            if HAS_PIL and piece and piece in piece_images:
                 # Place the piece image centered on the square
                 piece_img = piece_images[piece]
                 offset_x = (SQUARE_SIZE - piece_img.width) // 2
@@ -169,22 +182,93 @@ def make_board_image(world):
     
     return img
 
+
+def render_unicode_board(world):
+    """Render a simple Unicode board to stdout (Rich if available)."""
+    board = world.get("board") or [["" for _ in range(8)] for _ in range(8)]
+    # Build rows from top (8) to bottom (1)
+    rows = []
+    for r in range(8):
+        display_row = []
+        for c in range(8):
+            piece = board[r][c] if r < len(board) and c < len(board[r]) else ""
+            display_row.append(PIECES.get(piece, "."))
+        rows.append(display_row)
+
+    files = [chr(ord('a') + i) for i in range(8)]
+    ranks = [str(8 - i) for i in range(8)]
+
+    if HAS_RICH:
+        console = Console()
+        table = Table(show_header=True, header_style="bold", box=box.SIMPLE_HEAVY)
+        table.add_column(" ")
+        for f in files:
+            table.add_column(f, justify="center")
+        for i, row in enumerate(rows):
+            table.add_row(ranks[i], *row)
+        console.print(table)
+    else:
+        # Plain text fallback
+        out = []
+        out.append("    " + " ".join(files))
+        for i, row in enumerate(rows):
+            out.append(f"{ranks[i]}  " + " ".join(row))
+        print("\n".join(out))
+
 def render(world, context):
     """Main render function called by the view manager"""
-    console = Console()
+    console = Console() if HAS_RICH else None
 
-    # Build board image
-    img = make_board_image(world)
+    # If Pillow is available, build the board image
+    img = None
+    if HAS_PIL:
+        try:
+            img = make_board_image(world)
+        except Exception as e:
+            if console:
+                console.print(f"[red]Failed to build image: {e}[/]")
+            else:
+                print(f"Failed to build image: {e}")
 
-    # Try to display inline image with imgcat
-    if HAS_IMGCAT:
+    rendered_visual = False
+    # Try to display inline image with imgcat if we have a PNG
+    if img and HAS_IMGCAT:
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)
         try:
             imgcat(buf.getvalue())
+            rendered_visual = True
         except Exception as e:
-            console.print(f"[red]Failed to render image via imgcat: {e}[/]")
+            if console:
+                console.print(f"[red]Failed to render image via imgcat: {e}[/]")
+            else:
+                print(f"Failed to render image via imgcat: {e}")
+
+    # Save PNG to client data dir if provided
+    if img and not rendered_visual:
+        data_dir = None
+        # engine/view.py passes these in context; be resilient if missing
+        if isinstance(context, dict):
+            data_dir = context.get("data_dir") or context.get("client_dir")
+        try:
+            out_dir = Path(data_dir) if data_dir else Path.cwd()
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / "board.png"
+            img.save(out_path, format="PNG")
+            msg = f"Saved board image to: {out_path}"
+            if console:
+                console.print(f"[green]{msg}[/]")
+            else:
+                print(msg)
+        except Exception as e:
+            if console:
+                console.print(f"[yellow]Could not save PNG: {e}[/]")
+            else:
+                print(f"Could not save PNG: {e}")
+
+    # Always print a Unicode board so something renders everywhere
+    render_unicode_board(world)
 
 def handle_input(cmd, ctx):
     """Handle view-specific input"""

@@ -1,0 +1,4 @@
+Pillow>=9.0
+rich>=13.0
+watchdog>=2.1
+imgcat>=0.5
