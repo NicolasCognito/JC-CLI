@@ -36,11 +36,11 @@ HISTORY_PAGE_SIZE   = 200
 
 
 # ------------- entry scripts -------------------
-ORCHESTRATOR_SCRIPT = "app/orchestrator.py"
-RULE_LOOP_SCRIPT    = "app/rule_loop.py"
-SERVER_SCRIPT       = "app/thin_server.py"
-CLIENT_SCRIPT       = "app/thin_client.py"
-SEQUENCER_SCRIPT    = "app/sequencer.py"
+ORCHESTRATOR_SCRIPT = "engine/orchestrator.py"
+RULE_LOOP_SCRIPT    = "engine/rule_loop.py"
+SERVER_SCRIPT       = "engine/thin_server.py"
+CLIENT_SCRIPT       = "engine/thin_client.py"
+SEQUENCER_SCRIPT    = "engine/sequencer.py"
 SCRIPTS_DIR         = "scripts"
 DEFAULT_VIEW        = "default"
 
