@@ -27,6 +27,15 @@ INITIAL_WORLD_FILE  = "initial_world.json"
 COMMANDS_LOG_FILE   = "commands.log"
 CURSOR_FILE         = "cursor.seq"
 
+# ------------- execution mode -----------------
+# Modes:
+#   "file"   – default; state is read/written via data/world.json
+#   "memory" – sequencer maintains an in-memory world but still seeds
+#              command scripts by writing the current world to disk
+#              before each command and reading it back afterward.
+# Switch with env var JC_WORLD_MODE without changing repo config.
+WORLD_MODE          = "memory"
+
 # ------------- network -------------------------
 SERVER_HOST         = "0.0.0.0"
 SERVER_PORT         = 9000

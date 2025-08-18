@@ -71,11 +71,14 @@ class _TriggerHandler(FileSystemEventHandler):
 # Manager
 # ---------------------------------------------------------------------------
 class ViewManager:
-    def __init__(self, client_dir: str, username: str, view_id: str, mode: str, cmd_queue: str):
+    def __init__(self, client_dir: str, username: str, view_id: str, mode: str, cmd_queue: str,
+                 mem_host: str | None = None, mem_port: int | None = None):
         self.client_dir = Path(client_dir).resolve()
         self.username   = username
         self.cmd_queue  = Path(cmd_queue)
         self.data_dir   = self.client_dir / "data"
+        self.mem_host   = mem_host
+        self.mem_port   = mem_port
 
         # Discover views
         views_dir = self.client_dir / "scripts" / "views"
@@ -100,6 +103,20 @@ class ViewManager:
 
     # ---------------- world helpers ----------------
     def _load_world(self):
+        # In memory mode, fetch from sequencer via local socket if configured
+        if self.mem_host and self.mem_port:
+            import socket
+            try:
+                with socket.create_connection((self.mem_host, int(self.mem_port)), timeout=0.2) as s:
+                    try:
+                        s.sendall(b"GET\n")
+                    except Exception:
+                        pass
+                    data = s.recv(1 << 20)
+                return json.loads(data.decode("utf-8")) if data else {}
+            except Exception:
+                return {}
+        # Fallback: file mode
         world_path = self.data_dir / config.WORLD_FILE
         try:
             with world_path.open() as fh:
@@ -180,12 +197,15 @@ def _parse_args():
     p.add_argument("--view", default="default", help="View ID to start with")
     p.add_argument("--mode", choices=("fast", "commit"), default="commit",
                    help="fast=watch world.json, commit=watch cursor.seq")
+    p.add_argument("--mem-host", help="Memory-mode host (optional)")
+    p.add_argument("--mem-port", type=int, help="Memory-mode port (optional)")
     return p.parse_args()
 
 
 def main():
     args = _parse_args()
-    ViewManager(args.dir, args.username, args.view, args.mode, args.cmd_queue).start()
+    ViewManager(args.dir, args.username, args.view, args.mode, args.cmd_queue,
+                mem_host=args.mem_host, mem_port=args.mem_port).start()
 
 if __name__ == "__main__":
     main()

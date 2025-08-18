@@ -9,7 +9,7 @@ Event-based Sequencer – append-only log + cursor
 Processes commands in strict sequence, exactly once.
 """
 
-import os, sys, json, time, argparse, shlex, subprocess, threading
+import os, sys, json, time, argparse, shlex, subprocess, threading, socket
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import config
@@ -59,6 +59,19 @@ class Sequencer:
         open(self.log_file, "a").close()   # ensure exists
 
         self.cursor = _read_cursor(self.cursor_file)
+        # Optional in-memory pipeline (opt-in via JC_WORLD_MODE=memory or config)
+        self.world_mode = os.environ.get("JC_WORLD_MODE", getattr(config, "WORLD_MODE", "file"))
+        self.memory_world = None
+        if self.world_mode == "memory":
+            self.memory_world = self._read_world()
+            # Start lightweight world server for view fetch (no disk I/O)
+            self._mem_host = os.environ.get("JC_MEM_VIEW_HOST", "127.0.0.1")
+            try:
+                self._mem_port = int(os.environ.get("JC_MEM_VIEW_PORT", "0"))
+            except Exception:
+                self._mem_port = 0
+            if self._mem_port:
+                threading.Thread(target=self._world_server, daemon=True).start()
         self.lock   = threading.Lock()
 
         self.observer = Observer()
@@ -128,11 +141,16 @@ class Sequencer:
 
         # Execute without check=True, since we want to continue even if command fails
         # Capture output to show it in raw form
+        env = os.environ.copy()
+        if self.world_mode == "memory":
+            env["JC_WORLD_MODE"] = "memory"
+            env["JC_MEM_WORLD_IN"] = json.dumps(self.memory_world or {})
         result = subprocess.run(
             [sys.executable, self.orchestrator, text, user],
             cwd=self.client_dir,
             capture_output=True,
-            text=True
+            text=True,
+            env=env,
         )
         
         # Show raw output, not sanitized error messages
@@ -143,8 +161,64 @@ class Sequencer:
             
         if result.returncode != 0:
             print(f"!!! COMMAND FAILED: '{cmd_name}' (code {result.returncode})")
+        else:
+            if self.world_mode == "memory":
+                # Update in-memory world from orchestrator's final marker
+                for line in (result.stdout or "").splitlines()[::-1]:
+                    if line.startswith("WORLD_FINAL:"):
+                        payload = line.split(":", 1)[1].strip()
+                        try:
+                            self.memory_world = json.loads(payload)
+                        except Exception:
+                            pass
+                        break
         
         # Note: We don't return anything because sequencer will continue regardless
+
+    # ------------------------------------------------------------------ #
+
+    def _world_path(self) -> str:
+        return os.path.join(self.data_dir, config.WORLD_FILE)
+
+    def _read_world(self) -> dict:
+        try:
+            with open(self._world_path(), "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except FileNotFoundError:
+            return {}
+        except Exception:
+            return {}
+
+    def _write_world(self, world: dict) -> None:
+        path = self._world_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(world, fh, indent=2)
+
+    def _world_server(self):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind((self._mem_host, self._mem_port))
+                s.listen(5)
+                while True:
+                    conn, _ = s.accept()
+                    with conn:
+                        try:
+                            # read and ignore request; respond with JSON
+                            conn.recv(1024)
+                        except Exception:
+                            pass
+                        try:
+                            payload = json.dumps(self.memory_world or {})
+                        except Exception:
+                            payload = "{}"
+                        try:
+                            conn.sendall(payload.encode("utf-8"))
+                        except Exception:
+                            pass
+        except Exception as e:
+            print(f"[Memory] World server error: {e}")
 
 # ---------------------------------------------------------------------------#
 
