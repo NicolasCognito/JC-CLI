@@ -17,7 +17,7 @@ def start_sequencer(client):
     try:
         # Use the correct sequencer path from project root
         # Instead of looking in engine directory, use the path from config
-        sequencer_path = config.SEQUENCER_SCRIPT
+        sequencer_path = os.path.join(os.path.dirname(config.__file__), config.SEQUENCER_SCRIPT)
         
         # Make sure the path exists before trying to run it
         if not os.path.exists(sequencer_path):

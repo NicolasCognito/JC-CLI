@@ -1,6 +1,5 @@
 archive/
-sessions/
-clients/
+var/
 *.pyc
 __pycache__/
 engine/core/__pycache__/
