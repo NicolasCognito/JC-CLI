@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+import sys, pathlib
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 """
 JC-CLI Thin Client - Network-Enabled Version with Built-in CLI
 A minimal client that sends commands to the server, appends received ordered
@@ -56,6 +61,14 @@ def main():
         print(f"→ Automatically sending initial command: {cmd}")
         client_network.send_command(client, cmd)
 
+    # If memory mode is requested, prepare a view port for in-memory fetch
+    world_mode = os.environ.get("JC_WORLD_MODE", getattr(config, "WORLD_MODE", "file"))
+    if world_mode == "memory" and not os.environ.get("JC_MEM_VIEW_PORT"):
+        # Derive a deterministic port from username to avoid clashes
+        base = 18000
+        salt = sum(ord(c) for c in (client['username'] or 'user')) % 1000
+        os.environ["JC_MEM_VIEW_PORT"] = str(base + salt)
+
     # Start the sequencer process
     if not sequencer_control.start_sequencer(client):
         print("Failed to start sequencer.")
@@ -110,6 +123,13 @@ def start_view_in_new_window(client, view_name):
         view_cmd = f"{sys.executable} {view_script} --dir \"{client['client_dir']}\" " \
                    f"--username \"{client['username']}\" --view {view_name} " \
                    f"--cmd-queue \"{client['cmd_queue']}\""
+        # Pass memory-mode fetch coordinates to the view if enabled (env or config)
+        wm = os.environ.get("JC_WORLD_MODE", getattr(config, "WORLD_MODE", "file"))
+        if wm == "memory":
+            host = os.environ.get("JC_MEM_VIEW_HOST", "127.0.0.1")
+            port = os.environ.get("JC_MEM_VIEW_PORT")
+            if port:
+                view_cmd += f" --mem-host {host} --mem-port {port}"
         title = f"JC-CLI View: {client['username']}"
         return utils.launch_in_new_terminal(view_cmd, title=title)
     except Exception as e:

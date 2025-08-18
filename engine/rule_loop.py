@@ -16,7 +16,7 @@ Exit codes
 1+ – an error occurred
 """
 
-import json, sys, subprocess, pathlib, re
+import json, sys, subprocess, pathlib, re, os
 
 CWD           = pathlib.Path.cwd()
 RULES_DIR     = CWD / "scripts" / "rules"
@@ -40,7 +40,17 @@ def _discover_rules(folder: pathlib.Path = RULES_DIR) -> dict[str, str]:
             print(f"!!! ERROR: Cannot read rule script at {path}")
     return registry
 
-RULES = _discover_rules()
+def _load_rule_sources_from_env() -> dict[str, str]:
+    pack = os.environ.get("JC_RULE_PACK")
+    if not pack:
+        return {}
+    try:
+        data = json.loads(pack)
+        if isinstance(data, dict):
+            return {str(k): str(v) for k, v in data.items()}
+    except Exception:
+        pass
+    return {}
 
 def _load_world() -> dict:
     try:
@@ -92,27 +102,61 @@ def _run_rule(rid: str, path: str, world: dict) -> tuple[dict, bool]:
     print(f"!!! ERROR: Rule {rid} exited with code {proc.returncode}")
     return new_world, False
 
+def _run_rule_src(rid: str, source: str, world: dict) -> tuple[dict, bool]:
+    print(f"Running rule: {rid} => [in-memory]")
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", source],
+            input=json.dumps(world).encode(),
+            capture_output=True,
+        )
+        if proc.stderr:
+            sys.stderr.write(proc.stderr.decode('utf-8', errors='replace'))
+        try:
+            new_world = json.loads(proc.stdout or b"{}")
+        except json.JSONDecodeError as e:
+            print(f"!!! ERROR: Rule {rid} returned invalid JSON: {e}")
+            print(f"Raw output: {proc.stdout[:200]}...")
+            return world, False
+    except Exception as e:
+        print(f"!!! ERROR: Rule {rid} failed to execute in-memory: {e}")
+        return world, False
+    if proc.returncode == 0:
+        return new_world, True
+    if proc.returncode == 9:
+        return new_world, False
+    print(f"!!! ERROR: Rule {rid} exited with code {proc.returncode}")
+    return new_world, False
+
 def main():
-    if not RULES:
+    world_mode = os.environ.get("JC_WORLD_MODE", "file")
+    rule_sources = _load_rule_sources_from_env() if world_mode == "memory" else {}
+    rules_registry = _discover_rules() if not rule_sources else {rid: None for rid in rule_sources.keys()}
+
+    if not rules_registry:
         print("!!! WARNING: No rules found.")
         sys.exit(9)  # No changes
 
     world = _load_world()
     active = world.get("rules_in_power")
-    
-    # If no rules_in_power specified, run all discovered rules
     if active is None:
-        active = list(RULES.keys())
-    
+        active = list(rules_registry.keys())
+
     changed = False
 
     for rid in active:
-        path = RULES.get(rid)
-        if not path:
-            print(f"!!! ERROR: Rule '{rid}' specified in rules_in_power but script not found")
-            continue  # Continue with other rules
-        
-        world, did = _run_rule(rid, path, world)
+        path = rules_registry.get(rid)
+        if path is None and world_mode == "memory":
+            src = rule_sources.get(rid)
+            if not src:
+                print(f"!!! ERROR: Rule '{rid}' source not provided in memory mode")
+                continue
+            world, did = _run_rule_src(rid, src, world)
+        else:
+            if not path:
+                print(f"!!! ERROR: Rule '{rid}' specified in rules_in_power but script not found")
+                continue
+            world, did = _run_rule(rid, path, world)
         changed |= did
 
     _save_world(world)

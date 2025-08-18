@@ -6,10 +6,11 @@
 USE_WIZTERM = False
 
 # ------------- folders & files -----------------
-SESSIONS_DIR        = "sessions"
+SESSIONS_DIR        = "var/sessions"
 TEMPLATES_DIR       = "templates"
 DEFAULT_TEMPLATE     = "default"
-CLIENT_DIR          = "clients"
+CLIENT_DIR          = "clients"  # per-session clients subdir
+CLIENTS_ROOT        = "var/clients"  # local client workspaces root
 DATA_DIR            = "data"
 SNAPSHOT_DIR        = "engine_snapshot"      # inside session
 
@@ -26,6 +27,15 @@ INITIAL_WORLD_FILE  = "initial_world.json"
 COMMANDS_LOG_FILE   = "commands.log"
 CURSOR_FILE         = "cursor.seq"
 
+# ------------- execution mode -----------------
+# Modes:
+#   "file"   – default; state is read/written via data/world.json
+#   "memory" – sequencer maintains an in-memory world but still seeds
+#              command scripts by writing the current world to disk
+#              before each command and reading it back afterward.
+# Switch with env var JC_WORLD_MODE without changing repo config.
+WORLD_MODE          = "file"
+
 # ------------- network -------------------------
 SERVER_HOST         = "0.0.0.0"
 SERVER_PORT         = 9000
@@ -35,11 +45,11 @@ HISTORY_PAGE_SIZE   = 200
 
 
 # ------------- entry scripts -------------------
-ORCHESTRATOR_SCRIPT = "orchestrator.py"
-RULE_LOOP_SCRIPT    = "rule_loop.py"
-SERVER_SCRIPT       = "thin_server.py"
-CLIENT_SCRIPT       = "thin_client.py"
-SEQUENCER_SCRIPT    = "sequencer.py"
+ORCHESTRATOR_SCRIPT = "engine/orchestrator.py"
+RULE_LOOP_SCRIPT    = "engine/rule_loop.py"
+SERVER_SCRIPT       = "engine/thin_server.py"
+CLIENT_SCRIPT       = "engine/thin_client.py"
+SEQUENCER_SCRIPT    = "engine/sequencer.py"
 SCRIPTS_DIR         = "scripts"
 DEFAULT_VIEW        = "default"
 

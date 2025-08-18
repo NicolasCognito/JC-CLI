@@ -13,6 +13,7 @@ import config  # Use relative import within the package
 def setup_directories():
     """Ensure required base directories exist and create default template"""
     os.makedirs(config.SESSIONS_DIR, exist_ok=True)
+    os.makedirs(getattr(config, "CLIENTS_ROOT", "var/clients"), exist_ok=True)
     os.makedirs(config.TEMPLATES_DIR, exist_ok=True)
 
     # Create default template if it doesn't exist

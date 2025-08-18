@@ -25,7 +25,7 @@ def join_session(session_name, client_name, server_ip=None):
          return False
 
     # Define client directory structure - always create locally
-    client_dir = os.path.join("clients", session_name, client_name)
+    client_dir = os.path.join(config.CLIENTS_ROOT, session_name, client_name)
     client_data_dir = os.path.join(client_dir, "data")
 
     # Create client directories
@@ -52,7 +52,7 @@ def join_session(session_name, client_name, server_ip=None):
     # Copy required scripts to client directory
     scripts_to_copy_to_root = [config.ORCHESTRATOR_SCRIPT, config.RULE_LOOP_SCRIPT]
     for script_file in scripts_to_copy_to_root:
-        src_script_path = script_file # Assumes these are in CWD
+        src_script_path = os.path.join(os.path.dirname(config.__file__), script_file)
         dst_script_path = os.path.join(client_dir, os.path.basename(script_file))
         if os.path.exists(src_script_path):
             try:
@@ -64,7 +64,7 @@ def join_session(session_name, client_name, server_ip=None):
             print(f"Warning: Script '{script_file}' not found, could not copy to client.")
 
     # Copy the entire 'scripts' directory if it exists
-    src_scripts_dir = config.SCRIPTS_DIR # Assumes relative to CWD
+    src_scripts_dir = os.path.join(os.path.dirname(config.__file__), config.SCRIPTS_DIR)
     dst_scripts_dir = os.path.join(client_dir, config.SCRIPTS_DIR)
     if os.path.exists(src_scripts_dir):
         if utils.copy_directory(src_scripts_dir, dst_scripts_dir):

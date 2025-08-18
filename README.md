@@ -63,13 +63,13 @@ The implementation consists of several key components that work together to deli
 
 ### Entry Points
 
-- **jc-cli.py** - Interactive CLI shell that provides session, project, and version management
-- **thin_server.py** - Networked server that coordinates command distribution
-- **thin_client.py** - Client that connects to the server and processes commands locally
-- **orchestrator.py** - Core component that discovers and executes commands and rule scripts
-- **rule_loop.py** - Executes automatic effects after each command
-- **sequencer.py** - Ensures commands are processed in the same order on all clients
-- **view.py** - Launches appropriate game-specific view scripts
+- **jc-cli.py** - Interactive CLI shell for sessions and clients
+- **app/thin_server.py** - Networked server that coordinates command distribution
+- **app/thin_client.py** - Client that connects to the server and processes commands locally
+- **app/orchestrator.py** - Core component that discovers and executes commands and rule scripts
+- **app/rule_loop.py** - Executes automatic effects after each command
+- **app/sequencer.py** - Ensures commands are processed in the same order on all clients
+- **app/view.py** - Launches appropriate game-specific view scripts
 
 ### Engine Components
 
@@ -100,12 +100,12 @@ engine/
 ```
 project_root/
 ├─ jc-cli.py          # Interactive session manager
-├─ orchestrator.py    # Command discovery and execution
-├─ rule_loop.py       # Automatic effects execution
-├─ sequencer.py       # Ordered command processing
-├─ thin_client.py     # Networked client
-├─ thin_server.py     # Networked server
-├─ view.py            # View system launcher
+├─ app/orchestrator.py    # Command discovery and execution
+├─ app/rule_loop.py       # Automatic effects execution
+├─ app/sequencer.py       # Ordered command processing
+├─ app/thin_client.py     # Networked client
+├─ app/thin_server.py     # Networked server
+├─ app/view.py            # View system launcher
 ├─ engine/            # Infrastructure realm (described above)
 ├─ scripts/           # Logic realm (physically separate from engine)
 │   ├─ commands/      # One file per player command keyword
@@ -121,13 +121,13 @@ project_root/
 │   │   ├─ engine_snapshot.json  # Engine files manifest
 │   │   └─ client_snapshot.json  # Client files manifest
 │   └─ ... (other templates)
-├─ sessions/          # Active game sessions
+├─ var/sessions/          # Active game sessions
 │   └─ <session_name>/  # Each session gets its own directory
 │       ├─ data/        # Session-specific data
 │       ├─ engine_snapshot/  # Fixed engine code snapshot
 │       ├─ history.json  # Command history
 │       └─ initial_world.json  # Starting world state
-├─ clients/           # Client-specific data
+├─ var/clients/           # Client-specific data
 │   └─ <session_name>/
 │       └─ <client_name>/  # Each client gets its own directory
 │           ├─ data/      # Client-local data
@@ -585,7 +585,7 @@ Unknown command: my_command
 
 4. **Run the orchestrator directly**:
    ```
-   python orchestrator.py "command_name arg1 arg2"
+   python app/orchestrator.py "command_name arg1 arg2"
    ```
 
 ## Advanced Topics
@@ -672,7 +672,7 @@ To create a custom rule system:
    }
    ```
 
-3. The rule_loop.py script will automatically discover and apply these rules
+3. The app/rule_loop.py script will automatically discover and apply these rules
 
 ### Alternative View Systems
 
@@ -716,3 +716,50 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Contributors and maintainers
 - Inspiration from deterministic game engines
 - Early testers and feedback providers
+
+---
+
+# August 18 Updates: Memory Mode, Workers, and View Sync
+
+This repository now supports a high‑performance memory mode alongside the original file mode. Memory mode avoids disk I/O during command and rule execution and keeps the world in RAM inside the sequencer. It also adds persistent workers for commands and rules.
+
+## Execution Modes
+- File mode (default):
+  - Commands and rules run as separate Python processes.
+  - `data/world.json` is the source of truth and is updated after each command.
+  - Views read `world.json` directly or redraw on `cursor.seq`.
+- Memory mode (opt‑in):
+  - Set `JC_WORLD_MODE=memory` (or `config.WORLD_MODE = "memory"`).
+  - World state lives inside the sequencer; no file reads/writes during command/rule execution.
+  - Persistent workers: `engine/command_worker.py` (commands) and `engine/rule_worker.py` (rules).
+  - View fetches world from the sequencer via a local socket (no `world.json` reads).
+
+## Key Components
+- `engine/sequencer.py` (memory mode):
+  - Caches `scripts/commands/*.py` and `scripts/rules/*.py` sources at startup.
+  - Reuses a single command worker (in‑process execution of commands).
+  - Reuses a single rule worker (in‑process execution of rules).
+  - Serves world JSON to the view on `JC_MEM_VIEW_HOST`/`JC_MEM_VIEW_PORT`.
+- `engine/memshim/sitecustomize.py`:
+  - Intercepts `open('data/world.json')` for child processes when `JC_WORLD_MODE=memory`.
+  - Emits `WORLD_OUTPUT: { ... }` as single‑line JSON for easy parsing.
+- `engine/view.py`:
+  - Adds `--mem-host/--mem-port` to fetch world via socket (memory mode); otherwise reads `world.json` (file mode).
+
+## Environment Variables
+- `JC_WORLD_MODE`: `file` (default) or `memory`.
+- `JC_MEM_VIEW_HOST`, `JC_MEM_VIEW_PORT`: where the view fetches world in memory mode.
+- Internals used by the engine:
+  - `JC_CMD_SRC` (command source), `JC_RULE_PACK` (rule sources), `JC_MEM_WORLD_IN` (world JSON for children).
+
+## Quick Blast Script
+- New `quick_blast_session.bat`:
+  - Starts a session, joins Alice, waits for her `command_queue.txt`, appends 100× `raise 4`, then joins Bob.
+  - Usage: `quick_blast_session.bat [session-name]`.
+
+## Performance Notes
+- Memory mode removes process and disk overhead for command/rule execution and should feel “instant”.
+- File mode remains ideal for manual JSON editing and transparent debugging.
+  - For stress tests on Windows, consider pacing bursts or running from ext4 (WSL home) to reduce NTFS overhead.
+
+See `August18_MINDMAP.md` for a deeper architecture walk‑through of these additions.
